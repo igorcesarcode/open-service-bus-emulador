@@ -1,0 +1,12 @@
+{
+  "name": "open-service-bus-node-example",
+  "private": true,
+  "description": "Uses the official @azure/service-bus SDK against open-service-bus.",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@azure/service-bus": "^7.10.0"
+  }
+}

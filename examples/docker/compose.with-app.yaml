@@ -1,0 +1,28 @@
+# The emulator plus a Node.js program that talks to it, started together.
+#
+#   OSB_IMAGE=open-service-bus:local docker compose -f compose.with-app.yaml up --abort-on-container-exit
+#
+# Inside the Compose network the emulator is reached by service name, and
+# the connection string says so: Endpoint=sb://servicebus:5672.
+services:
+  servicebus:
+    image: ${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}
+    environment:
+      OSB_CONFIG: /config/Config.json
+      OSB_LOG_LEVEL: warn
+    volumes:
+      - ../config-json/Config.json:/config/Config.json:ro
+    # The image is FROM scratch (no shell, no curl), so there is no
+    # healthcheck; the app below simply starts after it.
+
+  app:
+    image: node:22
+    depends_on:
+      - servicebus
+    working_dir: /app
+    volumes:
+      - ../node-sdk:/app
+    environment:
+      OSB_CONNECTION_STRING: >-
+        Endpoint=sb://servicebus:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true
+    command: sh -c "npm install --no-audit --no-fund && node index.mjs"

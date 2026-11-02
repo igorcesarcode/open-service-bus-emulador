@@ -1,0 +1,148 @@
+package views
+
+import "fmt"
+
+templ GeoDRPageView(l Layout, p GeoDRPage) {
+	@Page(l) {
+		<h2 class="pagetitle">Geo-Recovery</h2>
+		<p class="hint">
+			Geo-Disaster Recovery pairs two namespaces under an alias. The alias serves the primary; its entities, rules and shared access
+			policies are copied to the secondary, its messages are not. A failover makes the alias serve the secondary and breaks the pairing.
+		</p>
+		if p.Message != "" {
+			<p class="notice" role="status">{ p.Message }</p>
+		}
+		if p.Error != "" {
+			<p class="error" role="alert">{ p.Error }</p>
+		}
+		<table class="list">
+			<thead><tr><th>Alias</th><th>Primary</th><th>Secondary</th><th>State</th><th>Last copy</th><th></th></tr></thead>
+			<tbody>
+				for _, r := range p.Rows {
+					<tr>
+						<td class="name">{ r.Alias }</td>
+						<td>{ r.Primary }</td>
+						<td>{ r.Secondary }</td>
+						<td>
+							if r.Paired {
+								<span class="status">Paired</span>
+							} else {
+								<span class="status off">Not paired</span>
+							}
+							if r.Role != "" {
+								<small>({ r.Role })</small>
+							}
+						</td>
+						<td class="time">{ r.LastSync }{ r.Error }</td>
+						<td class="act">
+							<form method="post" action="/$portal/geo-dr/action" class="inline">
+								<input type="hidden" name="alias" value={ r.Alias }/>
+								if r.Paired {
+									<button type="submit" name="action" value="failover" class="small" onclick="return confirm('Fail over? The alias serves the secondary and the pairing breaks.')">Failover</button>
+									<button type="submit" name="action" value="forced-failover" class="small danger" onclick="return confirm('Forced failover does not wait for pending changes. Continue?')">Forced failover</button>
+									<button type="submit" name="action" value="break" class="small">Break pairing</button>
+								}
+								<button type="submit" name="action" value="delete" class="small danger" onclick="return confirm('Delete the alias?')">Delete</button>
+							</form>
+						</td>
+					</tr>
+				}
+				if len(p.Rows) == 0 {
+					<tr class="empty"><td colspan="6">No aliases.</td></tr>
+				}
+			</tbody>
+		</table>
+		<h3 class="section">Initiate pairing</h3>
+		<form class="form" method="post" action="/$portal/geo-dr/action">
+			<input type="hidden" name="action" value="pair"/>
+			<label class="field"><span>Alias</span><input name="alias" required/></label>
+			<label class="field">
+				<span>Primary namespace</span>
+				<select name="primary">
+					for _, o := range p.Namespaces {
+						<option value={ o.Value } selected?={ o.Selected }>{ o.Label }</option>
+					}
+				</select>
+			</label>
+			<label class="field">
+				<span>Secondary namespace</span>
+				<select name="secondary">
+					for _, o := range p.Namespaces {
+						<option value={ o.Value }>{ o.Label }</option>
+					}
+				</select>
+			</label>
+			<div class="actions"><button type="submit" class="primary">Create</button></div>
+		</form>
+	}
+}
+
+templ GeoReplicationPageView(l Layout, g GeoReplicationView) {
+	@Page(l) {
+		<h2 class="pagetitle">Geo-Replication</h2>
+		<p class="hint">
+			Geo-Replication copies the namespace's data and metadata to a secondary region. A planned promotion waits for the secondary
+			to catch up; a forced one does not, and drops what was not copied. It cannot be combined with Geo-Recovery.
+		</p>
+		if g.Message != "" {
+			<p class="notice" role="status">{ g.Message }</p>
+		}
+		if g.Error != "" {
+			<p class="error" role="alert">{ g.Error }</p>
+		}
+		if g.Enabled {
+			<div id="georep" hx-get="/$portal/geo-replication/status" hx-trigger="every 3s" hx-swap="innerHTML">
+				@GeoReplicationStatusView(g)
+			</div>
+			<form method="post" action="/$portal/geo-replication/action" class="actions">
+				<button type="submit" name="action" value="promote" class="primary" onclick="return confirm('Promote the secondary region? The namespace is read-only until it catches up.')">Planned promotion</button>
+				<button type="submit" name="action" value="forced-promote" class="small danger" onclick="return confirm('A forced promotion drops what the secondary has not applied. Continue?')">Forced promotion</button>
+				<button type="submit" name="action" value="disable" class="small" onclick="return confirm('Remove the secondary region? Its data is deleted.')">Remove secondary</button>
+			</form>
+		} else {
+			<p class="hint">This namespace does not replicate its data.</p>
+			<form class="form" method="post" action="/$portal/geo-replication/action">
+				<input type="hidden" name="action" value="enable"/>
+				<label class="field"><span>Primary region</span><input name="primary" value={ g.PrimaryRegion }/></label>
+				<label class="field"><span>Secondary region</span><input name="secondary" value={ g.SecondaryRegion }/></label>
+				<fieldset>
+					<label class="check"><input type="checkbox" name="synchronous" value="true"/> Synchronous replication</label>
+				</fieldset>
+				<label class="field">
+					<span>Maximum replication lag (asynchronous)</span>
+					<input name="maxlag" value={ g.MaxLag }/>
+					<small>A duration such as 1m or 30s. The primary throttles beyond it.</small>
+				</label>
+				<label class="field">
+					<span>Simulated replication delay (asynchronous)</span>
+					<input name="delay" value={ g.Delay }/>
+					<small>A duration such as 200ms.</small>
+				</label>
+				<div class="actions"><button type="submit" class="primary">Add secondary region</button></div>
+			</form>
+		}
+	}
+}
+
+templ GeoReplicationStatusView(g GeoReplicationView) {
+	<dl class="essentials-dl">
+		<dt>Replication consistency</dt>
+		<dd>{ g.Mode }</dd>
+		<dt>Primary region</dt>
+		<dd>{ g.PrimaryRegion }</dd>
+		<dt>Secondary region</dt>
+		<dd>{ g.SecondaryRegion } ({ g.State })</dd>
+		<dt>Replication lag</dt>
+		<dd>{ g.LagDuration } ({ fmt.Sprint(g.LagCount) } pending changes)</dd>
+		<dt>Maximum lag</dt>
+		<dd>{ g.MaxLag }</dd>
+		if g.Promoting {
+			<dt>Promotion</dt>
+			<dd>in progress: the namespace refuses changes</dd>
+		}
+		if g.LastPromotion != "" {
+			<dt>Last promotion</dt>
+			<dd>{ g.LastPromotion } ({ fmt.Sprint(g.LostChanges) } changes dropped)</dd>
+		}
+	</dl>
+}

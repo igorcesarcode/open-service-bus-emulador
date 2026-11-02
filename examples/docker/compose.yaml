@@ -1,0 +1,33 @@
+# Emulator only, configured entirely through OSB_* environment variables,
+# with entities from a Config.json and a volume for the SQLite database.
+#
+#   docker compose up
+#
+# From the host:  Endpoint=sb://localhost:5672;...;UseDevelopmentEmulator=true
+# Portal:         https://localhost:5672/$portal/
+#
+# PLACEHOLDER IMAGE: ghcr.io/igorcesarcode/open-service-bus-emulador is not
+# published yet. Build one locally (`make image IMAGE=open-service-bus:local`
+# at the repository root) and run:
+#   OSB_IMAGE=open-service-bus:local docker compose up
+services:
+  servicebus:
+    image: ${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}
+    ports:
+      - "5672:5672"            # AMQP, AMQP over WebSocket, management API and portal
+    environment:
+      OSB_CONFIG: /config/Config.json
+      OSB_DB: /data/osb.db     # keep state across restarts
+      OSB_LOG_LEVEL: info
+      # Extra names the generated TLS certificate must cover, for clients
+      # that reach the emulator as "servicebus" inside the Compose network.
+      OSB_TLS_HOSTS: servicebus
+      # More entities without editing Config.json:
+      OSB_QUEUE: extra-queue-1,extra-queue-2
+    volumes:
+      - ../config-json/Config.json:/config/Config.json:ro
+      - osb-data:/data
+    restart: unless-stopped
+
+volumes:
+  osb-data:

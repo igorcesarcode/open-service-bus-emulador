@@ -1,0 +1,14 @@
+{
+  // Run with: open-service-bus -config examples/multi-namespace/Config.json
+  //
+  // The first label of the host selects the namespace:
+  //   orders.localhost:5672  -> "orders"
+  //   billing.localhost:5672 -> "billing"
+  //   localhost:5672         -> the default namespace (the first one, "orders")
+  "UserConfig": {
+    "Namespaces": [
+      { "Name": "orders", "Queues": [{ "Name": "incoming" }] },
+      { "Name": "billing", "Queues": [{ "Name": "incoming" }, { "Name": "invoices" }] }
+    ]
+  }
+}

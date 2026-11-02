@@ -1,0 +1,25 @@
+# Entities created from your Terraform: the emulator reads the .tf files
+# (it does not run Terraform) and builds the same queues, topics,
+# subscriptions and rules.
+#
+#   OSB_IMAGE=open-service-bus:local docker compose -f compose.terraform.yaml up
+#
+# Point the volume at your own infrastructure directory.
+services:
+  servicebus:
+    image: ${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}
+    ports:
+      - "5672:5672"
+    environment:
+      OSB_TERRAFORM: /infra
+      # Terraform variables, one name=value per line.
+      OSB_TF_VAR: |
+        environment=dev
+      # A module that cannot be downloaded (a private registry) is read by
+      # an adapter; this file names its argument lists when they differ from
+      # asb_queues, asb_topics_name and asb_subs.
+      # OSB_TF_MODULE_MAP: /infra/module-map.json
+      # Remove the $Default rule Azure keeps on subscriptions with rules:
+      # OSB_TF_DROP_DEFAULT_RULE: "true"
+    volumes:
+      - ../terraform:/infra:ro

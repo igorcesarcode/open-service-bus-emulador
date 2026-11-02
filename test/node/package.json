@@ -1,0 +1,13 @@
+{
+  "name": "open-service-bus-node-tests",
+  "private": true,
+  "description": "Validates open-service-bus with the official @azure/service-bus SDK for JavaScript.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1"
+  },
+  "dependencies": {
+    "@azure/service-bus": "7.10.0",
+    "@modelcontextprotocol/sdk": "1.17.5"
+  }
+}

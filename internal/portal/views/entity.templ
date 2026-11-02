@@ -1,0 +1,104 @@
+package views
+
+import "fmt"
+
+func EntityLink(path string) string { return "/$portal/entity?path=" + queryEscape(path) }
+
+templ EntityPageView(l Layout, e EntityPage) {
+	@Page(l) {
+		<div class="crumbs">
+			if e.TopicPath != "" {
+				<a href={ templ.SafeURL(EntityLink(e.TopicPath)) }>{ e.TopicName }</a> &rsaquo;
+			}
+			<strong>{ e.Name }</strong> <span class="kind">{ e.Kind }</span>
+		</div>
+		<div class="commands">
+			if e.Kind == "topic" {
+				<a class="cmd" href={ templ.SafeURL("/$portal/subscriptions/new?topic=" + queryEscape(e.Path)) }>+ Subscription</a>
+			}
+			if e.Kind == "subscription" {
+				<a class="cmd" href={ templ.SafeURL("/$portal/rules?path=" + queryEscape(e.Path)) }>Rules</a>
+			}
+			<a class="cmd" href={ templ.SafeURL("/$portal/explorer?path=" + queryEscape(e.Path)) }>Service Bus Explorer</a>
+			<a class="cmd" href={ templ.SafeURL("/$portal/entity/edit?path=" + queryEscape(e.Path)) }>Properties</a>
+			<button class="cmd" type="button" hx-post="/$portal/entities/delete" hx-vals={ fmt.Sprintf(`{"path": %q, "redirect": "1"}`, e.Path) } hx-confirm={ "Delete " + e.Kind + " " + e.Name + " and its messages?" }>Delete</button>
+			<button class="cmd" type="button" hx-get="/$portal/entity/live" hx-vals={ fmt.Sprintf(`{"path": %q}`, e.Path) } hx-target="#live" hx-include="#range">&#8635; Refresh</button>
+		</div>
+		<details open class="essentials">
+			<summary>Essentials</summary>
+			<dl>
+				for _, p := range e.Props {
+					<dt>{ p.Key }</dt>
+					<dd>{ p.Value }</dd>
+				}
+			</dl>
+		</details>
+		<div id="live" hx-get="/$portal/entity/live" hx-vals={ fmt.Sprintf(`{"path": %q}`, e.Path) } hx-trigger="every 5s" hx-include="#range" hx-swap="innerHTML">
+			@EntityLiveView(e.Live)
+		</div>
+		if e.Kind == "topic" {
+			<h3 class="section">Subscriptions</h3>
+			<input class="search" type="search" name="q" value={ e.Query } placeholder="Search to filter items..." hx-get="/$portal/entity/subscriptions" hx-vals={ fmt.Sprintf(`{"path": %q}`, e.Path) } hx-trigger="input changed delay:250ms, search" hx-target="#subs"/>
+			<table class="list">
+				<thead><tr><th>Name</th><th>Status</th><th>Message count</th><th>Max delivery count</th><th>Client Scoped</th><th>Shared</th></tr></thead>
+				<tbody id="subs">
+					@SubscriptionRows(e.Subscriptions)
+				</tbody>
+			</table>
+		}
+	}
+}
+
+templ SubscriptionRows(rows []SubscriptionRow) {
+	for _, r := range rows {
+		<tr>
+			<td class="name"><a href={ templ.SafeURL(EntityLink(r.Path)) }>{ r.Name }</a></td>
+			<td><span class={ "status", templ.KV("off", r.Status != "Active") }>{ r.Status }</span></td>
+			<td class="num">{ fmt.Sprint(r.Messages) }</td>
+			<td class="num">{ fmt.Sprint(r.MaxDelivery) }</td>
+			<td>No</td>
+			<td>N/A</td>
+		</tr>
+	}
+	if len(rows) == 0 {
+		<tr class="empty"><td colspan="6">No subscriptions.</td></tr>
+	}
+}
+
+// EntityLiveView is the part of an entity page that refreshes: the tiles,
+// the counts and the charts.
+templ EntityLiveView(l EntityLive) {
+	<div class="tiles">
+		for _, t := range l.Tiles {
+			<div class="tile">
+				<span class="label">{ t.Label }</span>
+				<strong>{ t.Value }</strong> <span class="unit">{ t.Unit }</span>
+			</div>
+		}
+	</div>
+	if len(l.Counts) > 0 {
+		<div class="tiles counts">
+			for _, t := range l.Counts {
+				<div class="tile">
+					<span class="label">{ t.Label }</span>
+					<strong>{ t.Value }</strong>
+				</div>
+			}
+		</div>
+	}
+	<div class="range">
+		<span>Show data for the last:</span>
+		<div id="range" class="pills" role="radiogroup">
+			for _, r := range l.Ranges {
+				<label class={ "pill", templ.KV("on", r.Active) }>
+					<input type="radio" name="range" value={ r.Key } checked?={ r.Active } hx-get="/$portal/entity/live" hx-vals={ fmt.Sprintf(`{"path": %q}`, l.Path) } hx-target="#live" hx-include="#range"/>
+					{ r.Label }
+				</label>
+			}
+		</div>
+	</div>
+	<div class="charts">
+		@ChartView(l.Requests)
+		@ChartView(l.Messages)
+	</div>
+}

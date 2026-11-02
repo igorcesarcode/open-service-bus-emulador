@@ -1,0 +1,80 @@
+package terraform
+
+import (
+	"github.com/hashicorp/hcl/v2/ext/tryfunc"
+	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/function"
+	"github.com/zclconf/go-cty/cty/function/stdlib"
+)
+
+// functions returns the Terraform built-in functions that entity
+// declarations commonly use. Functions that read files or the network
+// are left out.
+func functions() map[string]function.Function {
+	return map[string]function.Function{
+		"abs":             stdlib.AbsoluteFunc,
+		"can":             tryfunc.CanFunc,
+		"ceil":            stdlib.CeilFunc,
+		"chomp":           stdlib.ChompFunc,
+		"chunklist":       stdlib.ChunklistFunc,
+		"coalesce":        stdlib.CoalesceFunc,
+		"coalescelist":    stdlib.CoalesceListFunc,
+		"compact":         stdlib.CompactFunc,
+		"concat":          stdlib.ConcatFunc,
+		"contains":        stdlib.ContainsFunc,
+		"csvdecode":       stdlib.CSVDecodeFunc,
+		"distinct":        stdlib.DistinctFunc,
+		"element":         stdlib.ElementFunc,
+		"flatten":         stdlib.FlattenFunc,
+		"floor":           stdlib.FloorFunc,
+		"format":          stdlib.FormatFunc,
+		"formatdate":      stdlib.FormatDateFunc,
+		"formatlist":      stdlib.FormatListFunc,
+		"indent":          stdlib.IndentFunc,
+		"index":           stdlib.IndexFunc,
+		"join":            stdlib.JoinFunc,
+		"jsondecode":      stdlib.JSONDecodeFunc,
+		"jsonencode":      stdlib.JSONEncodeFunc,
+		"keys":            stdlib.KeysFunc,
+		"length":          stdlib.LengthFunc,
+		"log":             stdlib.LogFunc,
+		"lookup":          stdlib.LookupFunc,
+		"lower":           stdlib.LowerFunc,
+		"max":             stdlib.MaxFunc,
+		"merge":           stdlib.MergeFunc,
+		"min":             stdlib.MinFunc,
+		"parseint":        stdlib.ParseIntFunc,
+		"pow":             stdlib.PowFunc,
+		"range":           stdlib.RangeFunc,
+		"regex":           stdlib.RegexFunc,
+		"regexall":        stdlib.RegexAllFunc,
+		"replace":         stdlib.ReplaceFunc,
+		"reverse":         stdlib.ReverseListFunc,
+		"setintersection": stdlib.SetIntersectionFunc,
+		"setproduct":      stdlib.SetProductFunc,
+		"setsubtract":     stdlib.SetSubtractFunc,
+		"setunion":        stdlib.SetUnionFunc,
+		"signum":          stdlib.SignumFunc,
+		"slice":           stdlib.SliceFunc,
+		"sort":            stdlib.SortFunc,
+		"split":           stdlib.SplitFunc,
+		"strrev":          stdlib.ReverseFunc,
+		"substr":          stdlib.SubstrFunc,
+		"timeadd":         stdlib.TimeAddFunc,
+		"title":           stdlib.TitleFunc,
+		"tobool":          stdlib.MakeToFunc(cty.Bool),
+		"tolist":          stdlib.MakeToFunc(cty.List(cty.DynamicPseudoType)),
+		"tomap":           stdlib.MakeToFunc(cty.Map(cty.DynamicPseudoType)),
+		"tonumber":        stdlib.MakeToFunc(cty.Number),
+		"toset":           stdlib.MakeToFunc(cty.Set(cty.DynamicPseudoType)),
+		"tostring":        stdlib.MakeToFunc(cty.String),
+		"trim":            stdlib.TrimFunc,
+		"trimprefix":      stdlib.TrimPrefixFunc,
+		"trimspace":       stdlib.TrimSpaceFunc,
+		"trimsuffix":      stdlib.TrimSuffixFunc,
+		"try":             tryfunc.TryFunc,
+		"upper":           stdlib.UpperFunc,
+		"values":          stdlib.ValuesFunc,
+		"zipmap":          stdlib.ZipmapFunc,
+	}
+}

@@ -1,0 +1,54 @@
+package views
+
+templ MetricsPageView(l Layout, p MetricsPage) {
+	@Page(l) {
+		<form id="mx" class="metricsform" hx-get="/$portal/metrics/view" hx-target="#mview" hx-trigger="change, every 10s">
+			<label class="field">
+				<span>Entity</span>
+				<select name="entity">
+					for _, o := range p.Entities {
+						<option value={ o.Value } selected?={ o.Selected }>{ o.Label }</option>
+					}
+				</select>
+			</label>
+			<fieldset>
+				<legend>Requests, messages and connections (sum)</legend>
+				for _, m := range p.Counters {
+					<label class="check"><input type="checkbox" name="m" value={ m.Name } checked?={ m.On }/> { m.Label }</label>
+				}
+			</fieldset>
+			<fieldset>
+				<legend>Counts and sizes (latest value)</legend>
+				for _, m := range p.Gauges {
+					<label class="check"><input type="checkbox" name="m" value={ m.Name } checked?={ m.On }/> { m.Label }</label>
+				}
+			</fieldset>
+			<div class="range">
+				<span>Show data for the last:</span>
+				<div class="pills" role="radiogroup">
+					for _, r := range p.Ranges {
+						<label class={ "pill", templ.KV("on", r.Active) }>
+							<input type="radio" name="range" value={ r.Key } checked?={ r.Active }/>
+							{ r.Label }
+						</label>
+					}
+				</div>
+			</div>
+		</form>
+		<div id="mview">
+			@MetricsView(p)
+		</div>
+	}
+}
+
+templ MetricsView(p MetricsPage) {
+	<div class="charts">
+		for _, c := range p.Charts {
+			@ChartView(c)
+		}
+		if len(p.Charts) == 0 {
+			<p class="hint">Select at least one metric.</p>
+		}
+	</div>
+	<p class="hint">The same numbers as JSON: <a href={ templ.SafeURL(p.APIURL) }>{ p.APIURL }</a></p>
+}

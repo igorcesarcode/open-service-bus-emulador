@@ -1,0 +1,124 @@
+package views
+
+import "fmt"
+
+templ EntitiesPage(l Layout, e EntityList) {
+	@Page(l) {
+		<div class="commands">
+			<a class="cmd" href={ templ.SafeURL("/$portal/" + e.Kind + "s/new") }>+ { title(e.Kind) }</a>
+			<button class="cmd" type="button" hx-get={ "/$portal/" + e.Kind + "s/rows" } hx-target="#rows" hx-include="#q">&#8635; Refresh</button>
+		</div>
+		<input id="q" class="search" type="search" name="q" value={ e.Query } placeholder={ "Search " + e.Kind + "s by name" } hx-get={ "/$portal/" + e.Kind + "s/rows" } hx-trigger="input changed delay:250ms, search" hx-target="#rows"/>
+		<table class="list">
+			<thead>
+				if e.Kind == "queue" {
+					<tr><th>Name</th><th>Status</th><th>Active</th><th>Dead-letter</th><th>Scheduled</th><th>Size</th><th>Max delivery</th><th></th></tr>
+				} else {
+					<tr><th>Name</th><th>Status</th><th>Subscriptions</th><th>Scheduled</th><th>Size</th><th>Max size</th><th></th></tr>
+				}
+			</thead>
+			<tbody id="rows" hx-get={ "/$portal/" + e.Kind + "s/rows" } hx-trigger="every 5s" hx-include="#q">
+				@EntityRows(e)
+			</tbody>
+		</table>
+	}
+}
+
+func title(kind string) string {
+	if kind == "" {
+		return ""
+	}
+	return string(kind[0]-32) + kind[1:]
+}
+
+templ EntityRows(e EntityList) {
+	for _, r := range e.Rows {
+		<tr>
+			<td class="name"><a href={ templ.SafeURL(EntityLink(r.Path)) }>{ r.Name }</a></td>
+			<td><span class={ "status", templ.KV("off", r.Status != "Active") }>{ r.Status }</span></td>
+			if e.Kind == "queue" {
+				<td class="num">{ fmt.Sprint(r.Active) }</td>
+				<td class="num">{ fmt.Sprint(r.DeadLetter) }</td>
+				<td class="num">{ fmt.Sprint(r.Scheduled) }</td>
+				<td class="num">{ r.Size }</td>
+				<td class="num">{ fmt.Sprint(r.MaxDelivery) }</td>
+			} else {
+				<td class="num">{ fmt.Sprint(r.Subscriptions) }</td>
+				<td class="num">{ fmt.Sprint(r.Scheduled) }</td>
+				<td class="num">{ r.Size }</td>
+				<td class="num">{ r.MaxSize }</td>
+			}
+			<td class="act">
+				<button type="button" class="small danger" hx-post="/$portal/entities/delete" hx-vals={ fmt.Sprintf(`{"path": %q}`, r.Path) } hx-confirm={ "Delete " + e.Kind + " " + r.Name + " and its messages?" } hx-target="closest tr" hx-swap="outerHTML">Delete</button>
+			</td>
+		</tr>
+	}
+	if len(e.Rows) == 0 {
+		<tr class="empty"><td colspan="8">No { e.Kind }s.</td></tr>
+	}
+}
+
+templ EntityFormPage(l Layout, f EntityForm) {
+	@Page(l) {
+		if f.Edit {
+			<h2 class="pagetitle">Properties: { f.Name }</h2>
+		} else {
+			<h2 class="pagetitle">Create { f.Kind }</h2>
+		}
+		if f.Error != "" {
+			<p class="error" role="alert">{ f.Error }</p>
+		}
+		<form class="form" method="post" action={ templ.SafeURL(f.Action) }>
+			if f.Topic != "" {
+				<input type="hidden" name="topic" value={ f.Topic }/>
+			}
+			if f.Edit {
+				<input type="hidden" name="path" value={ f.Path }/>
+			}
+			<label class="field">
+				<span>Name</span>
+				if f.Edit {
+					<input name="name" value={ f.Name } readonly/>
+				} else {
+					<input name="name" value={ f.Name } required autofocus/>
+				}
+			</label>
+			for _, t := range f.Text {
+				<label class="field">
+					<span>{ t.Label }</span>
+					<input name={ t.Name } value={ t.Value }/>
+					if t.Help != "" {
+						<small>{ t.Help }</small>
+					}
+				</label>
+			}
+			<label class="field">
+				<span>Status</span>
+				<select name="status">
+					for _, s := range f.Statuses {
+						<option value={ s } selected?={ s == f.Status }>{ s }</option>
+					}
+				</select>
+			</label>
+			<fieldset>
+				for _, c := range f.Checks {
+					<label class="check">
+						<input type="checkbox" name={ c.Name } value="true" checked?={ c.On } disabled?={ c.Disabled }/>
+						{ c.Label }
+						if c.Disabled {
+							<small>(cannot change after creation)</small>
+						}
+					</label>
+				}
+			</fieldset>
+			<div class="actions">
+				if f.Edit {
+					<button type="submit" class="primary">Save</button>
+				} else {
+					<button type="submit" class="primary">Create</button>
+				}
+				<a class="cmd" href={ templ.SafeURL(f.Cancel) }>Cancel</a>
+			</div>
+		</form>
+	}
+}

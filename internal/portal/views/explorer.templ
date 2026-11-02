@@ -1,0 +1,282 @@
+package views
+
+import "fmt"
+
+func explorerURL(path string) string { return "/$portal/explorer?path=" + queryEscape(path) }
+
+templ ExplorerPage(l Layout, e Explorer) {
+	@Page(l) {
+		<div class="crumbs">
+			if e.TopicPath != "" {
+				<a href={ templ.SafeURL(EntityLink(e.TopicPath)) }>{ e.TopicName }</a> &rsaquo;
+			}
+			<a href={ templ.SafeURL(EntityLink(e.Path)) }><strong>{ e.Name }</strong></a>
+			<span class="kind">Service Bus Explorer</span>
+		</div>
+		if e.Kind == "topic" {
+			<p class="hint">A topic holds no messages. Pick a subscription to see its messages.</p>
+			<table class="list">
+				<thead><tr><th>Subscription</th><th>Status</th><th>Message count</th></tr></thead>
+				<tbody>
+					for _, s := range e.Subscriptions {
+						<tr>
+							<td class="name"><a href={ templ.SafeURL(explorerURL(s.Path)) }>{ s.Name }</a></td>
+							<td>{ s.Status }</td>
+							<td class="num">{ fmt.Sprint(s.Messages) }</td>
+						</tr>
+					}
+					if len(e.Subscriptions) == 0 {
+						<tr class="empty"><td colspan="3">No subscriptions.</td></tr>
+					}
+				</tbody>
+			</table>
+		} else {
+			<div id="explorer" hx-get="/$portal/explorer/view" hx-trigger="refresh-explorer from:body" hx-include="#ex" hx-target="#explorer">
+				@ExplorerBody(e)
+			</div>
+			<section id="detail" class="detail"></section>
+			<aside id="send" class="drawer" hidden></aside>
+		}
+	}
+}
+
+templ ExplorerBody(e Explorer) {
+	<form id="ex" onsubmit="return false">
+		<input type="hidden" name="path" value={ e.Path }/>
+		<input type="hidden" name="queue" value={ e.Queue }/>
+		<input type="hidden" name="next" value={ fmt.Sprint(e.Next) }/>
+		<div class="topbar">
+			<select name="mode" aria-label="Mode" hx-get="/$portal/explorer/view" hx-target="#explorer" hx-include="#ex" hx-trigger="change">
+				<option value="peek" selected?={ e.Mode == "peek" }>Peek Mode</option>
+				<option value="receive" selected?={ e.Mode == "receive" }>Receive Mode</option>
+			</select>
+			<button type="button" class="cmd" hx-get="/$portal/explorer/send" hx-include="#ex" hx-target="#send" hx-on::after-request="document.getElementById('send').hidden=false">&#10148; Send messages</button>
+			<button type="button" class="cmd" hx-get="/$portal/explorer/view" hx-include="#ex" hx-target="#explorer">&#8635; Refresh</button>
+			<span class="spacer"></span>
+			<button type="submit" class="cmd" formaction="/$portal/explorer/export" formmethod="get" formtarget="_blank" name="format" value="json">Export messages (JSON)</button>
+			<button type="submit" class="cmd" formaction="/$portal/explorer/export" formmethod="get" formtarget="_blank" name="format" value="csv">CSV</button>
+		</div>
+		<div class="tabs" role="tablist">
+			for _, t := range e.Tabs {
+				<button type="button" role="tab" class={ "tab", templ.KV("on", t.Active) } hx-get="/$portal/explorer/view" hx-include="#ex" hx-vals={ fmt.Sprintf(`{"queue": %q, "op": "start"}`, t.Key) } hx-target="#explorer">{ t.Label } ({ fmt.Sprint(t.Count) })</button>
+			}
+		</div>
+		if e.Mode == "peek" {
+			<div class="toolbar">
+				<button type="button" class="cmd" hx-get="/$portal/explorer/view" hx-include="#ex" hx-vals='{"op": "start"}' hx-target="#explorer">&#8635; Peek from start</button>
+				<button type="button" class="cmd" hx-get="/$portal/explorer/view" hx-include="#ex" hx-vals='{"op": "next"}' hx-target="#explorer">&rarr; Peek next messages</button>
+				<span class="opts">
+					<label>From sequence <input class="narrow" name="from" value={ fmt.Sprint(e.From) } inputmode="numeric"/></label>
+					<label>Count <input class="narrow" name="count" value={ fmt.Sprint(e.Count) } inputmode="numeric"/></label>
+					<label class="check"><input type="checkbox" name="utc" value="1" checked?={ e.UTC }/> UTC</label>
+					<button type="button" class="cmd" hx-get="/$portal/explorer/view" hx-include="#ex" hx-vals='{"op": "opts"}' hx-target="#explorer">Peek with options</button>
+				</span>
+				<button type="button" class="cmd" hx-post="/$portal/explorer/resend" hx-include="#ex" hx-target="#explorer" hx-confirm="Send the selected messages again?">&#8634; Re-send selected messages</button>
+				<button type="submit" class="cmd" formaction="/$portal/explorer/body" formmethod="get" formtarget="_blank">&#8595; Download selected message body</button>
+			</div>
+		} else {
+			<div class="toolbar">
+				<label>Count <input class="narrow" name="count" value={ fmt.Sprint(e.Count) } inputmode="numeric"/></label>
+				<select name="settle" aria-label="Receive mode">
+					<option value="peeklock">Peek-lock</option>
+					<option value="delete">Receive and delete</option>
+				</select>
+				<button type="button" class="cmd" hx-post="/$portal/explorer/view" hx-include="#ex" hx-vals='{"op": "receive"}' hx-target="#explorer">Receive</button>
+				<span class="opts">
+					<button type="button" class="cmd" hx-post="/$portal/explorer/settle" hx-include="#ex" hx-vals='{"action": "complete"}' hx-target="#explorer">Complete</button>
+					<button type="button" class="cmd" hx-post="/$portal/explorer/settle" hx-include="#ex" hx-vals='{"action": "abandon"}' hx-target="#explorer">Abandon</button>
+					<button type="button" class="cmd" hx-post="/$portal/explorer/settle" hx-include="#ex" hx-vals='{"action": "defer"}' hx-target="#explorer">Defer</button>
+					if e.CanDeadLetter {
+						<input name="reason" placeholder="Dead-letter reason"/>
+						<input name="description" placeholder="Description"/>
+						<button type="button" class="cmd" hx-post="/$portal/explorer/settle" hx-include="#ex" hx-vals='{"action": "deadletter"}' hx-target="#explorer">Dead-letter</button>
+					}
+				</span>
+			</div>
+		}
+		<div class="toolbar purge">
+			<button type="button" class="cmd danger" hx-post="/$portal/explorer/purge" hx-include="#ex" hx-target="#explorer" hx-confirm={ "Delete every message of " + e.Name + " (" + e.QueueLabel() + ")? Locked messages and scheduled ones stay. This cannot be undone." }>&#128465; Purge</button>
+		</div>
+		if e.Error != "" {
+			<p class="error" role="alert">{ e.Error }</p>
+		}
+		if e.Message != "" {
+			<p class="notice" role="status">{ e.Message }</p>
+		}
+		<p class="showing">Showing { fmt.Sprint(e.Shown) } of { fmt.Sprint(e.Total) } messages</p>
+		<div class="tablewrap">
+			<table class="list messages">
+				<thead>
+					<tr>
+						<th><input type="checkbox" aria-label="Select all" data-select-all/></th>
+						<th>Sequence Number</th><th>Message ID</th><th>Enqueued Time</th><th>Delivery Count</th><th>State</th>
+						<th>Body size</th><th>Label/Subject</th><th>Message Text</th><th>Session ID</th>
+						if e.Mode == "receive" {
+							<th>Locked until</th>
+						}
+					</tr>
+				</thead>
+				<tbody>
+					for _, r := range e.Rows {
+						<tr class={ templ.KV("sel", r.Seq == e.Selected) } hx-get="/$portal/explorer/detail" hx-vals={ fmt.Sprintf(`{"seq": %d}`, r.Seq) } hx-include="#ex" hx-target="#detail" hx-trigger="click[event.target.tagName!='INPUT']">
+							<td>
+								if e.Mode == "receive" {
+									<input type="checkbox" name="token" value={ r.LockToken } aria-label="Select"/>
+									<input type="hidden" name="held" value={ r.Held }/>
+								} else {
+									<input type="checkbox" name="seq" value={ fmt.Sprint(r.Seq) } aria-label="Select"/>
+								}
+							</td>
+							<td class="num">{ fmt.Sprint(r.Seq) }</td>
+							<td class="mono">{ r.MessageID }</td>
+							<td class="time">{ r.Enqueued }</td>
+							<td class="num">{ fmt.Sprint(r.DeliveryCount) }</td>
+							<td>{ r.State }</td>
+							<td class="num">{ r.BodySize }</td>
+							<td>{ r.Subject }</td>
+							<td class="text">{ r.Text }</td>
+							<td>{ r.SessionID }</td>
+							if e.Mode == "receive" {
+								<td class="time">{ r.LockedUntil }</td>
+							}
+						</tr>
+					}
+					if len(e.Rows) == 0 {
+						<tr class="empty"><td colspan="11">No messages.</td></tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</form>
+}
+
+templ DetailPanel(d MessageDetail) {
+	<div class="dtabs">
+		<input type="radio" name="dtab" id="dt-body" checked/>
+		<label for="dt-body">Message Body</label>
+		<input type="radio" name="dtab" id="dt-props"/>
+		<label for="dt-props">Message Properties</label>
+		<div class="pane pane-body">
+			<pre class={ "body", d.BodyKind }>{ d.Body }</pre>
+			if d.BodyKind != "empty" {
+				<small class="kindnote">{ d.BodyKind }</small>
+			}
+		</div>
+		<div class="pane pane-props">
+			<div class="kv2">
+				<div>
+					<h4>Broker Properties</h4>
+					<table class="list">
+						<thead><tr><th>Key</th><th>Value</th></tr></thead>
+						<tbody>
+							for _, p := range d.Broker {
+								<tr><td class="name">{ p.Key }</td><td class="mono">{ p.Value }</td></tr>
+							}
+						</tbody>
+					</table>
+				</div>
+				<div>
+					<h4>Custom Properties</h4>
+					<table class="list">
+						<thead><tr><th>Key</th><th>Value</th><th>Type</th></tr></thead>
+						<tbody>
+							for _, p := range d.Custom {
+								<tr><td class="name">{ p.Key }</td><td class="mono">{ p.Value }</td><td>{ p.Type }</td></tr>
+							}
+							if len(d.Custom) == 0 {
+								<tr class="empty"><td colspan="3">No custom properties.</td></tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ SendPanelView(p SendPanel) {
+	<form class="sendform" hx-post="/$portal/explorer/send" hx-target="#send" hx-disinherit="*">
+		<header>
+			<h3>Send messages</h3>
+			<button type="button" class="small" data-close-drawer aria-label="Close">&times;</button>
+		</header>
+		<input type="hidden" name="path" value={ p.Path }/>
+		<p class="hint">To { p.Name }</p>
+		if p.Error != "" {
+			<p class="error" role="alert">{ p.Error }</p>
+		}
+		<label class="field">
+			<span>Content type</span>
+			<select name="contentType">
+				for _, c := range p.ContentTypes {
+					<option value={ c } selected?={ c == p.ContentType }>{ c }</option>
+				}
+			</select>
+		</label>
+		<label class="field">
+			<span>Upload .json file</span>
+			<input type="file" accept=".json,application/json" data-fill="body"/>
+		</label>
+		<label class="field">
+			<span>Message Body</span>
+			<div class="editor">
+				<pre class="gutter" aria-hidden="true">1</pre>
+				<textarea name="body" rows="10" spellcheck="false" data-editor>{ p.Body }</textarea>
+			</div>
+			<small class="jsonstate" data-json-state></small>
+		</label>
+		<details>
+			<summary>Broker Properties</summary>
+			for _, f := range p.Fields {
+				<label class="field">
+					<span>{ f.Label }</span>
+					<input name={ f.Name } value={ f.Value }/>
+					if f.Help != "" {
+						<small>{ f.Help }</small>
+					}
+				</label>
+			}
+		</details>
+		<details>
+			<summary>Custom Properties</summary>
+			<div class="props" id="props">
+				for _, c := range p.Custom {
+					@PropRow(c, p.Types)
+				}
+			</div>
+			<button type="button" class="small" data-add-row="props">+ Add property</button>
+			<template id="prop-template">
+				@PropRow(Prop{Type: "string"}, p.Types)
+			</template>
+		</details>
+		<label class="check">
+			<input type="checkbox" data-repeat-toggle checked?={ p.Repeat > 1 }/> Repeat send
+		</label>
+		<div class="repeat" data-repeat hidden?={ p.Repeat <= 1 }>
+			<label class="field"><span>Times</span><input name="repeat" value={ fmt.Sprint(p.Repeat) } inputmode="numeric"/></label>
+			<label class="field"><span>Interval (ms)</span><input name="interval" value={ fmt.Sprint(p.IntervalMs) } inputmode="numeric"/></label>
+		</div>
+		<div class="actions">
+			<button type="submit" class="primary">Send</button>
+			<button type="button" class="cmd" data-close-drawer>Cancel</button>
+		</div>
+	</form>
+}
+
+templ PropRow(p Prop, types []string) {
+	<div class="proprow">
+		<input name="pkey" value={ p.Key } placeholder="Key" aria-label="Key"/>
+		<select name="ptype" aria-label="Type">
+			for _, t := range types {
+				<option value={ t } selected?={ t == p.Type }>{ t }</option>
+			}
+		</select>
+		<input name="pvalue" value={ p.Value } placeholder="Value" aria-label="Value"/>
+		<button type="button" class="small" data-remove-row aria-label="Remove">&times;</button>
+	</div>
+}
+
+templ SendDone(p SendPanel, msg string) {
+	@SendPanelView(p)
+	<p class="notice" role="status">{ msg }</p>
+}

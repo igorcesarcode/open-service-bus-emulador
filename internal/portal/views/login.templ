@@ -1,0 +1,40 @@
+package views
+
+templ LoginPage(name, errMsg string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>Sign in - open-service-bus</title>
+			<link rel="stylesheet" href="/$portal/assets/portal.css"/>
+		</head>
+		<body>
+			<main class="login">
+				<h1>{ name }</h1>
+				<p class="hint">This namespace requires authentication. Sign in with a shared access policy that has the Manage right, such as RootManageSharedAccessKey.</p>
+				if errMsg != "" {
+					<p class="error" role="alert">{ errMsg }</p>
+				}
+				<form class="form" method="post" action="/$portal/login">
+					<label class="field">
+						<span>Connection string</span>
+						<input name="connection" autocomplete="off" placeholder="Endpoint=sb://...;SharedAccessKeyName=...;SharedAccessKey=..."/>
+					</label>
+					<p class="hint">or</p>
+					<label class="field">
+						<span>Policy name</span>
+						<input name="name" autocomplete="username"/>
+					</label>
+					<label class="field">
+						<span>Key</span>
+						<input name="key" type="password" autocomplete="current-password"/>
+					</label>
+					<div class="actions">
+						<button type="submit" class="primary">Sign in</button>
+					</div>
+				</form>
+			</main>
+		</body>
+	</html>
+}

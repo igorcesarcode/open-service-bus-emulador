@@ -1,0 +1,76 @@
+package views
+
+import "fmt"
+
+templ OverviewPage(l Layout, o Overview) {
+	@Page(l) {
+		<div class="commands">
+			<a class="cmd" href="/$portal/queues/new">+ Queue</a>
+			<a class="cmd" href="/$portal/topics/new">+ Topic</a>
+			<button class="cmd" type="button" hx-get="/$portal/overview/live" hx-target="#live" hx-include="#range">&#8635; Refresh</button>
+		</div>
+		@Essentials(o.Info)
+		<div id="live" hx-get="/$portal/overview/live" hx-trigger="every 5s" hx-include="#range" hx-swap="innerHTML">
+			@Live(o)
+		</div>
+	}
+}
+
+templ Essentials(i Info) {
+	<details open class="essentials">
+		<summary>Essentials</summary>
+		<dl>
+			<dt>Status</dt>
+			<dd>{ i.Status }</dd>
+			<dt>Endpoint</dt>
+			<dd>{ i.Endpoint }</dd>
+			<dt>Version</dt>
+			<dd>{ i.Version }</dd>
+			<dt>Database</dt>
+			<dd>{ i.Database }</dd>
+			<dt>Uptime</dt>
+			<dd>{ i.Uptime }</dd>
+			<dt>Entities</dt>
+			<dd>{ fmt.Sprint(i.Queues) } queues, { fmt.Sprint(i.Topics) } topics</dd>
+			<dt>Connection string</dt>
+			<dd>@copyValue(i.ConnectionStr)</dd>
+			if i.AMQPConnection != "" && i.AMQPConnection != i.ConnectionStr {
+				<dt>AMQP connection string</dt>
+				<dd>@copyValue(i.AMQPConnection)</dd>
+			}
+			if i.HTTPConnection != "" && i.HTTPConnection != i.ConnectionStr {
+				<dt>HTTP connection string</dt>
+				<dd>@copyValue(i.HTTPConnection)</dd>
+			}
+			if i.HasCertificate {
+				<dt>TLS certificate</dt>
+				<dd><a href="/$portal/certificate.pem" download="open-service-bus.pem">Download (PEM)</a></dd>
+			}
+		</dl>
+	</details>
+}
+
+templ copyValue(v string) {
+	<span class="copy">
+		<code>{ v }</code>
+		<button type="button" class="small" data-copy={ v }>Copy</button>
+	</span>
+}
+
+// Live is the part of the overview that refreshes: the range selector and
+// the charts.
+templ Live(o Overview) {
+	<div class="range">
+		<span>Show data for the last:</span>
+		<div id="range" class="pills" role="radiogroup">
+			for _, r := range o.Ranges {
+				<label class={ "pill", templ.KV("on", r.Active) }>
+					<input type="radio" name="range" value={ r.Key } checked?={ r.Active } hx-get="/$portal/overview/live" hx-target="#live" hx-include="#range"/>
+					{ r.Label }
+				</label>
+			}
+		</div>
+	</div>
+	@ChartView(o.Requests)
+	@ChartView(o.Messages)
+}

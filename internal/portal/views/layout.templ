@@ -1,0 +1,72 @@
+package views
+
+import "github.com/igorcesarcode/open-service-bus-emulador/internal/unsupported"
+
+templ Page(l Layout) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ l.Title } - open-service-bus</title>
+			<link rel="stylesheet" href="/$portal/assets/portal.css"/>
+			<script src="/$portal/assets/htmx.min.js"></script>
+			<script src="/$portal/assets/portal.js" defer></script>
+		</head>
+		<body>
+			<header class="top">
+				<button class="menu" type="button" aria-label="Menu" data-toggle-nav>&#9776;</button>
+				<div class="brand">
+					<span class="logo" aria-hidden="true">&#9993;</span>
+					<div>
+						<h1>{ l.Name }</h1>
+						<span class="sub">Service Bus Namespace</span>
+					</div>
+				</div>
+				if len(l.Namespaces) > 1 {
+					<form class="switcher" method="get" action="/$portal/">
+						<label class="sub" for="ns">Namespace</label>
+						<select id="ns" name="ns" onchange="this.form.submit()">
+							for _, o := range l.Namespaces {
+								<option value={ o.Value } selected?={ o.Selected }>{ o.Label }</option>
+							}
+						</select>
+					</form>
+				}
+			</header>
+			<div class="shell">
+				<nav class="side" id="side">
+					@navLink(l.Nav, NavOverview, "/$portal/", "Overview")
+					@navLink(l.Nav, NavActivity, "/$portal/activity", "Activity log")
+					@navLink(l.Nav, NavMetrics, "/$portal/metrics", "Metrics")
+					<h2>Settings</h2>
+					@navLink(l.Nav, NavPolicies, "/$portal/policies", "Shared access policies")
+					@navLink(l.Nav, NavAccess, "/$portal/access", "Access control (IAM)")
+					@navLink(l.Nav, NavGeoDR, "/$portal/geo-dr", "Geo-Recovery")
+					@navLink(l.Nav, NavGeoRep, "/$portal/geo-replication", "Geo-Replication")
+					@navLink(l.Nav, NavProps, "/$portal/properties", "Properties and locks")
+					@navLink(l.Nav, NavExport, "/$portal/export", "Export template")
+					<h2>Not supported</h2>
+					for _, f := range unsupported.All() {
+						if f.ID != "jms-client-scoped-subscriptions" {
+							<a class="unsupported" href={ templ.SafeURL("/$portal/unsupported#" + f.ID) } title="Not supported by the emulator">{ f.Name }</a>
+						}
+					}
+					<h2>Entities</h2>
+					@navLink(l.Nav, NavQueues, "/$portal/queues", "Queues")
+					@navLink(l.Nav, NavTopics, "/$portal/topics", "Topics")
+					if l.SignOut {
+						<form method="post" action="/$portal/logout" class="signout"><button type="submit" class="small">Sign out</button></form>
+					}
+				</nav>
+				<main>
+					{ children... }
+				</main>
+			</div>
+		</body>
+	</html>
+}
+
+templ navLink(current, page Nav, href, label string) {
+	<a href={ templ.SafeURL(href) } class={ "navlink", templ.KV("current", current == page) }>{ label }</a>
+}

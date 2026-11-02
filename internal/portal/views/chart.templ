@@ -1,0 +1,29 @@
+package views
+
+import "fmt"
+
+templ ChartView(c Chart) {
+	<section class="chart">
+		<h3>{ c.Title }</h3>
+		<svg viewBox={ fmt.Sprintf("0 0 %d %d", c.Width, c.Height) } role="img" aria-label={ c.Title }>
+			for _, t := range c.YTicks {
+				<line class="grid" x1={ fmt.Sprint(c.Left) } x2={ fmt.Sprint(c.Width - c.Right) } y1={ fmt.Sprintf("%.1f", t.Pos) } y2={ fmt.Sprintf("%.1f", t.Pos) }></line>
+				<text class="axis" x={ fmt.Sprint(c.Left - 6) } y={ fmt.Sprintf("%.1f", t.Pos+4) } text-anchor="end">{ t.Label }</text>
+			}
+			for _, t := range c.XTicks {
+				<text class="axis" x={ fmt.Sprintf("%.1f", t.Pos) } y={ fmt.Sprint(c.Height - 8) } text-anchor="middle">{ t.Label }</text>
+			}
+			for _, s := range c.Series {
+				<path class={ "line", s.Class } d={ s.Path }></path>
+			}
+		</svg>
+		<ul class="legend">
+			for _, s := range c.Series {
+				<li class={ "key", s.Class }>
+					<span class="name">{ s.Name }</span>
+					<strong>{ s.Total }</strong>
+				</li>
+			}
+		</ul>
+	</section>
+}

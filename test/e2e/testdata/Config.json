@@ -1,0 +1,84 @@
+{
+  // Entities of the end-to-end mini-services, in the format of the
+  // official emulator's Config.json.
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "e2e",
+        "Queues": [
+          {"Name": "results"},
+          {"Name": "pricing"},
+          {"Name": "pricing-replies", "Properties": {"RequiresSession": true}},
+          {"Name": "escalations"},
+          {"Name": "jobs-poison"},
+          {"Name": "jobs", "Properties": {"ForwardDeadLetteredMessagesTo": "jobs-poison"}},
+          {"Name": "payments", "Properties": {"RequiresDuplicateDetection": true, "DuplicateDetectionHistoryTimeWindow": "PT1H"}}
+        ],
+        "Topics": [
+          {
+            "Name": "orders",
+            "Subscriptions": [
+              {
+                "Name": "fulfillment",
+                "Properties": {"RequiresSession": true, "MaxDeliveryCount": 3, "LockDuration": "PT30S"}
+              },
+              {"Name": "audit"}
+            ]
+          },
+          {
+            // Event routing: rules shaped like the production ones.
+            "Name": "events",
+            "Subscriptions": [
+              {
+                "Name": "approved",
+                "Rules": [{
+                  "Name": "approved",
+                  "Properties": {
+                    "FilterType": "Sql",
+                    "SqlFilter": {"SqlExpression": "event in ('completed', 'approved') AND isApproved = TRUE"}
+                  }
+                }]
+              },
+              {
+                "Name": "bulk",
+                "Rules": [{
+                  "Name": "bulk",
+                  "Properties": {"FilterType": "Sql", "SqlFilter": {"SqlExpression": "quantity > 10"}}
+                }]
+              },
+              {
+                "Name": "eu-orders",
+                "Rules": [{
+                  "Name": "eu",
+                  "Properties": {
+                    "FilterType": "Correlation",
+                    "CorrelationFilter": {"Label": "order.created", "Properties": {"region": "eu"}}
+                  }
+                }]
+              },
+              {
+                "Name": "priced",
+                "Rules": [{
+                  "Name": "price",
+                  "Properties": {
+                    "FilterType": "Sql",
+                    "SqlFilter": {"SqlExpression": "1=1"},
+                    "Action": {"SqlExpression": "SET priced = TRUE; SET total = quantity * 2"}
+                  }
+                }]
+              },
+              {
+                "Name": "relay",
+                "Properties": {"ForwardTo": "escalations"},
+                "Rules": [{
+                  "Name": "escalated",
+                  "Properties": {"FilterType": "Sql", "SqlFilter": {"SqlExpression": "event = 'escalated'"}}
+                }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

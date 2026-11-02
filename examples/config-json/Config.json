@@ -1,0 +1,91 @@
+{
+  // Same format as the official emulator's Config.json, without range
+  // limits and with extra fields (AuthorizationRules, Locks, Tags, ...).
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "demo",
+        "Queues": [
+          { "Name": "orders" },
+          {
+            // Dead-lettered messages of "jobs" are forwarded to "jobs-poison".
+            "Name": "jobs",
+            "Properties": {
+              "LockDuration": "PT30S",
+              "MaxDeliveryCount": 3,
+              "DefaultMessageTimeToLive": "P14D",
+              "DeadLetteringOnMessageExpiration": true,
+              "ForwardDeadLetteredMessagesTo": "jobs-poison"
+            }
+          },
+          { "Name": "jobs-poison" },
+          {
+            // Sessions: messages with the same SessionId are delivered in order
+            // to one receiver at a time.
+            "Name": "replies",
+            "Properties": { "RequiresSession": true }
+          },
+          {
+            // Duplicate detection: a MessageId seen within the window is dropped.
+            "Name": "payments",
+            "Properties": {
+              "RequiresDuplicateDetection": true,
+              "DuplicateDetectionHistoryTimeWindow": "PT1H"
+            }
+          }
+        ],
+        "Topics": [
+          {
+            "Name": "events",
+            "Subscriptions": [
+              { "Name": "audit" },
+              {
+                // SQL filter on application properties.
+                "Name": "big-orders",
+                "Rules": [
+                  {
+                    "Name": "big",
+                    "Properties": {
+                      "FilterType": "Sql",
+                      "SqlFilter": { "SqlExpression": "quantity > 10" }
+                    }
+                  }
+                ]
+              },
+              {
+                // Correlation filter on Subject and a custom property.
+                "Name": "eu-created",
+                "Rules": [
+                  {
+                    "Name": "eu",
+                    "Properties": {
+                      "FilterType": "Correlation",
+                      "CorrelationFilter": {
+                        "Label": "order.created",
+                        "Properties": { "region": "eu" }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                // A rule action rewrites the message for this subscription only.
+                "Name": "priced",
+                "Rules": [
+                  {
+                    "Name": "price",
+                    "Properties": {
+                      "FilterType": "Sql",
+                      "SqlFilter": { "SqlExpression": "1=1" },
+                      "Action": { "SqlExpression": "SET total = quantity * 2" }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

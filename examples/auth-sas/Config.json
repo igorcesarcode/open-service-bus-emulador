@@ -1,0 +1,30 @@
+{
+  // Run with: open-service-bus -auth sas -config examples/auth-sas/Config.json
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "secure",
+        // Namespace-level policies. Keys are optional: a policy declared
+        // without keys gets deterministic ones derived from its name.
+        "AuthorizationRules": [
+          {
+            "Name": "RootManageSharedAccessKey",
+            "Rights": ["Manage", "Send", "Listen"],
+            "PrimaryKey": "root-primary-key",
+            "SecondaryKey": "root-secondary-key"
+          }
+        ],
+        "Queues": [
+          {
+            "Name": "orders",
+            // Entity-level policies apply to this queue only.
+            "AuthorizationRules": [
+              { "Name": "producer", "Rights": ["Send"], "PrimaryKey": "producer-key" },
+              { "Name": "consumer", "Rights": ["Listen"], "PrimaryKey": "consumer-key" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

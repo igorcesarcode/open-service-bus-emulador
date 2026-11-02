@@ -1,0 +1,124 @@
+package views
+
+import "fmt"
+
+templ PoliciesPageView(l Layout, p PoliciesPage) {
+	@Page(l) {
+		<h2 class="pagetitle">Shared access policies</h2>
+		if p.AuthMode == "none" {
+			<p class="notice">Authentication is off, so policies are stored but not checked. Start the emulator with <code>-auth sas</code> to check them.</p>
+		}
+		if p.Error != "" {
+			<p class="error" role="alert">{ p.Error }</p>
+		}
+		<table class="list">
+			<thead><tr><th>Scope</th><th>Policy</th><th>Claims</th><th>Primary key</th><th>Secondary key</th><th></th></tr></thead>
+			<tbody id="policies">
+				@PolicyRows(p)
+			</tbody>
+		</table>
+		<h3 class="section">Add policy</h3>
+		<form class="form" method="post" action="/$portal/policies">
+			<label class="field">
+				<span>Scope</span>
+				<select name="scope">
+					for _, o := range p.Scopes {
+						<option value={ o.Value }>{ o.Label }</option>
+					}
+				</select>
+			</label>
+			<label class="field"><span>Policy name</span><input name="name" required/></label>
+			<fieldset>
+				<label class="check"><input type="checkbox" name="rights" value="Listen"/> Listen</label>
+				<label class="check"><input type="checkbox" name="rights" value="Send"/> Send</label>
+				<label class="check"><input type="checkbox" name="rights" value="Manage"/> Manage</label>
+			</fieldset>
+			<div class="actions"><button type="submit" class="primary">Create</button></div>
+		</form>
+	}
+}
+
+templ PolicyRows(p PoliciesPage) {
+	for _, r := range p.Rows {
+		<tr>
+			<td>{ r.ScopeLabel }</td>
+			<td class="name">{ r.Name }</td>
+			<td>{ r.Rights }</td>
+			<td>
+				<code class="key">{ r.PrimaryKey }</code>
+				<button type="button" class="small" data-copy={ r.PrimaryKey }>Copy</button>
+				<button type="button" class="small" data-copy={ r.Connection }>Connection string</button>
+			</td>
+			<td>
+				<code class="key">{ r.SecondaryKey }</code>
+				<button type="button" class="small" data-copy={ r.SecondaryKey }>Copy</button>
+			</td>
+			<td class="act">
+				<button type="button" class="small" hx-post="/$portal/policies/regenerate" hx-vals={ fmt.Sprintf(`{"scope": %q, "name": %q, "which": "primary"}`, r.Scope, r.Name) } hx-confirm="Regenerate the primary key? Tokens signed with the old one stop working." hx-target="#policies">New primary</button>
+				<button type="button" class="small" hx-post="/$portal/policies/regenerate" hx-vals={ fmt.Sprintf(`{"scope": %q, "name": %q, "which": "secondary"}`, r.Scope, r.Name) } hx-confirm="Regenerate the secondary key?" hx-target="#policies">New secondary</button>
+				<button type="button" class="small danger" hx-post="/$portal/policies/delete" hx-vals={ fmt.Sprintf(`{"scope": %q, "name": %q}`, r.Scope, r.Name) } hx-confirm={ "Delete policy " + r.Name + "?" } hx-target="#policies">Delete</button>
+			</td>
+		</tr>
+	}
+	if len(p.Rows) == 0 {
+		<tr class="empty"><td colspan="6">No policies.</td></tr>
+	}
+}
+
+templ AccessPageView(l Layout, p AccessPage) {
+	@Page(l) {
+		<h2 class="pagetitle">Access control (IAM)</h2>
+		if p.AuthMode != "full" {
+			<p class="notice">Role assignments apply to Entra ID tokens, which are accepted with <code>-auth full</code>. Until then they are stored but not used.</p>
+		}
+		if p.Issuer {
+			<p class="hint">Test tokens: <code>POST /$auth/token</code> with <code>principal=&lt;object id&gt;</code>.</p>
+		}
+		if p.Error != "" {
+			<p class="error" role="alert">{ p.Error }</p>
+		}
+		<table class="list">
+			<thead><tr><th>Principal (object id)</th><th>Role</th><th>Scope</th><th></th></tr></thead>
+			<tbody id="assignments">
+				@AssignmentRows(p)
+			</tbody>
+		</table>
+		<h3 class="section">Add role assignment</h3>
+		<form class="form" method="post" action="/$portal/access">
+			<label class="field"><span>Principal (object id)</span><input name="principal" required/></label>
+			<label class="field">
+				<span>Role</span>
+				<select name="role">
+					for _, r := range p.Roles {
+						<option value={ r }>{ r }</option>
+					}
+				</select>
+			</label>
+			<label class="field">
+				<span>Scope</span>
+				<select name="scope">
+					for _, o := range p.Scopes {
+						<option value={ o.Value }>{ o.Label }</option>
+					}
+				</select>
+			</label>
+			<div class="actions"><button type="submit" class="primary">Add</button></div>
+		</form>
+	}
+}
+
+templ AssignmentRows(p AccessPage) {
+	for _, r := range p.Rows {
+		<tr>
+			<td class="mono">{ r.Principal }</td>
+			<td>{ r.Role }</td>
+			<td>{ r.ScopeLabel }</td>
+			<td class="act">
+				<button type="button" class="small danger" hx-post="/$portal/access/delete" hx-vals={ fmt.Sprintf(`{"id": "%d"}`, r.ID) } hx-confirm="Remove this role assignment?" hx-target="#assignments">Remove</button>
+			</td>
+		</tr>
+	}
+	if len(p.Rows) == 0 {
+		<tr class="empty"><td colspan="4">No role assignments.</td></tr>
+	}
+}

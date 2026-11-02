@@ -1,0 +1,31 @@
+# The emulator exporting OpenTelemetry traces to Jaeger.
+#
+#   OSB_IMAGE=open-service-bus:local docker compose up
+#
+# Then drive the emulator (for example `go run ./examples/go-sdk` against
+# localhost:5672) and open Jaeger at http://localhost:16686, service
+# "open-service-bus".
+#
+# PLACEHOLDER IMAGE: ghcr.io/igorcesarcode/open-service-bus-emulador is not
+# published yet; build one with `make image IMAGE=open-service-bus:local`.
+services:
+  servicebus:
+    image: ${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}
+    ports:
+      - "5672:5672"
+    environment:
+      OSB_CONFIG: /config/Config.json
+      OSB_OTEL_ENDPOINT: http://jaeger:4318
+      OSB_OTEL_SIGNALS: traces        # Jaeger takes traces only
+      OSB_OTEL_SAMPLE: "1"            # lower it under heavy load
+    volumes:
+      - ../config-json/Config.json:/config/Config.json:ro
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"                 # UI

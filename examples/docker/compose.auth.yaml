@@ -1,0 +1,16 @@
+# Shared access signatures validated, with the policies of examples/auth-sas.
+#
+#   OSB_IMAGE=open-service-bus:local docker compose -f compose.auth.yaml up
+#
+# Connect with:
+#   Endpoint=sb://localhost:5672;SharedAccessKeyName=producer;SharedAccessKey=producer-key;EntityPath=orders;UseDevelopmentEmulator=true
+services:
+  servicebus:
+    image: ${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}
+    ports:
+      - "5672:5672"
+    environment:
+      OSB_AUTH: sas              # none | sas | full
+      OSB_CONFIG: /config/Config.json
+    volumes:
+      - ../auth-sas/Config.json:/config/Config.json:ro

@@ -1,0 +1,18 @@
+# The MCP management endpoint for AI agents, on its own port. It has no
+# login: publish it on loopback only, as below.
+#
+#   OSB_IMAGE=open-service-bus:local docker compose -f compose.mcp.yaml up
+#   claude mcp add --transport http osb http://127.0.0.1:5680/mcp
+services:
+  servicebus:
+    image: ${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}
+    ports:
+      - "5672:5672"
+      - "127.0.0.1:5680:5680"    # never publish this port beyond loopback
+    environment:
+      OSB_QUEUE: orders
+      # Inside the container the endpoint must listen on all interfaces so
+      # Docker can forward to it.
+      OSB_MCP_ADDR: 0.0.0.0:5680
+      OSB_MCP_READONLY: "false"
+      OSB_MCP_ALLOW_DATA: "true"

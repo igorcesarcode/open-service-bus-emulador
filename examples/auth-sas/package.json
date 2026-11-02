@@ -1,0 +1,12 @@
+{
+  "name": "open-service-bus-auth-sas-example",
+  "private": true,
+  "description": "Shared access policies enforced by open-service-bus -auth sas.",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@azure/service-bus": "^7.10.0"
+  }
+}

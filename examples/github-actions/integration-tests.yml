@@ -1,0 +1,50 @@
+# Runs your integration tests against the emulator in GitHub Actions.
+# Copy this file to .github/workflows/ in your own repository.
+#
+# PLACEHOLDER: replace VERSION with a real release once one is published at
+# https://github.com/igorcesarcode/open-service-bus-emulador/releases
+name: integration-tests
+
+on: [push, pull_request]
+
+env:
+  OSB_VERSION: vX.Y.Z   # placeholder
+
+jobs:
+  # Option A: download the single binary and run it in the background.
+  with-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the emulator
+        run: |
+          curl -fsSL -o open-service-bus \
+            "https://github.com/igorcesarcode/open-service-bus-emulador/releases/download/${OSB_VERSION}/open-service-bus-${OSB_VERSION}-linux-amd64"
+          chmod +x open-service-bus
+      - name: Start the emulator
+        run: |
+          ./open-service-bus -config servicebus/Config.json -log-level warn &
+          # Wait for the port.
+          for i in $(seq 1 50); do (echo > /dev/tcp/127.0.0.1/5672) 2>/dev/null && break; sleep 0.2; done
+      - name: Run the tests
+        env:
+          SERVICEBUS_CONNECTION_STRING: Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true
+        run: ./run-your-tests.sh
+
+  # Option B: run the container image as a service.
+  with-container:
+    runs-on: ubuntu-latest
+    services:
+      servicebus:
+        image: ghcr.io/igorcesarcode/open-service-bus-emulador:latest   # placeholder
+        ports:
+          - 5672:5672
+        # Arguments of the service container are not supported by `services`;
+        # declare entities through an image of your own, or create them from
+        # the tests with the administration client.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the tests
+        env:
+          SERVICEBUS_CONNECTION_STRING: Endpoint=sb://localhost:5672;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true
+        run: ./run-your-tests.sh

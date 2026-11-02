@@ -1,0 +1,13 @@
+open-service-bus-emulador
+Copyright 2026 The open-service-bus-emulador contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+open-service-bus-emulador is an independent project. It is not affiliated with,
+endorsed by or sponsored by Microsoft. "Azure" and "Service Bus" are trademarks
+of Microsoft Corporation.
+
+Acknowledgements: the official Azure Service Bus emulator
+(https://github.com/Azure/azure-service-bus-emulator-installer, MIT License)
+and AlmostServiceBus (https://github.com/gkinsman/AlmostServiceBus) were
+studied as references for behavior. No code from them is included.

@@ -1,0 +1,23 @@
+# Consult-only material, not part of the project.
+/reference/
+
+# Build output and dependencies.
+/open-service-bus
+/bin/
+node_modules/
+test/dotnet/bin/
+test/dotnet/obj/
+
+# Local data and profiles.
+*.db
+*.db-wal
+*.db-shm
+*.prof
+*.pprof
+*.test
+/main.tf
+
+# Local working notes, not published.
+/.local/
+/CLAUDE.md
+/dist/

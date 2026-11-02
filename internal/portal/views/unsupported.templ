@@ -1,0 +1,19 @@
+package views
+
+import "github.com/igorcesarcode/open-service-bus-emulador/internal/unsupported"
+
+templ UnsupportedPageView(l Layout) {
+	@Page(l) {
+		<h2 class="pagetitle">Not supported</h2>
+		<p class="hint">
+			These Azure Service Bus features are left out of the emulator. A configuration that declares one is loaded without it, and the
+			start-up log says so (<code>level=WARN unsupported=&lt;id&gt;</code>).
+		</p>
+		for _, f := range unsupported.All() {
+			<section class="unsupported-item" id={ f.ID }>
+				<h3 class="section">{ f.Name } <small>({ f.ID })</small></h3>
+				<p>{ f.Why }</p>
+			</section>
+		}
+	}
+}

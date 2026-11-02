@@ -1,0 +1,41 @@
+package views
+
+templ ActivityPageView(l Layout, a ActivityPage) {
+	@Page(l) {
+		<div class="commands">
+			<button class="cmd" type="button" hx-get="/$portal/activity/rows" hx-target="#rows" hx-include="#filters">&#8635; Refresh</button>
+		</div>
+		<form id="filters" class="filters" hx-get="/$portal/activity/rows" hx-target="#rows" hx-trigger="input changed delay:250ms, change">
+			<input name="entity" value={ a.Entity } placeholder="Entity" type="search"/>
+			<input name="operation" value={ a.Operation } placeholder="Operation" type="search"/>
+			<input name="actor" value={ a.Actor } placeholder="Actor" type="search"/>
+			<select name="status">
+				<option value="">Any status</option>
+				<option value="Succeeded" selected?={ a.Status == "Succeeded" }>Succeeded</option>
+				<option value="Failed" selected?={ a.Status == "Failed" }>Failed</option>
+			</select>
+		</form>
+		<table class="list">
+			<thead><tr><th>Time</th><th>Operation</th><th>Entity</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
+			<tbody id="rows" hx-get="/$portal/activity/rows" hx-trigger="every 5s" hx-include="#filters">
+				@ActivityRows(a)
+			</tbody>
+		</table>
+	}
+}
+
+templ ActivityRows(a ActivityPage) {
+	for _, r := range a.Rows {
+		<tr>
+			<td class="time">{ r.Time }</td>
+			<td>{ r.Operation }</td>
+			<td class="name">{ r.Entity }</td>
+			<td><span class={ "status", templ.KV("off", r.Failed) }>{ r.Status }</span></td>
+			<td>{ r.Actor }</td>
+			<td class="detail">{ r.Detail }</td>
+		</tr>
+	}
+	if len(a.Rows) == 0 {
+		<tr class="empty"><td colspan="6">No operations match.</td></tr>
+	}
+}
