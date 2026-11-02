@@ -5,16 +5,19 @@ These Compose files cover the usual setups. All of them configure the emulator
 through `OSB_*` environment variables (every command-line flag has one; the
 full list is in [Configuration](../../docs/configuration.md#environment-variables)).
 
-> **Placeholder image.** `ghcr.io/igorcesarcode/open-service-bus-emulador` is
-> not published yet. Build it from source and tell Compose to use it:
->
-> ```bash
-> make image IMAGE=open-service-bus:local        # at the repository root
-> export OSB_IMAGE=open-service-bus:local        # PowerShell: $env:OSB_IMAGE = "open-service-bus:local"
-> ```
->
-> Every file uses `${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}`,
-> so once the image exists you can drop the variable.
+Every file uses `${OSB_IMAGE:-ghcr.io/igorcesarcode/open-service-bus-emulador:latest}`.
+To use an image you built from source instead, set the variable:
+
+```bash
+make image IMAGE=open-service-bus:local        # at the repository root
+export OSB_IMAGE=open-service-bus:local        # PowerShell: $env:OSB_IMAGE = "open-service-bus:local"
+```
+
+**Ports.** These files publish only 5672 and their connection strings carry
+`UseDevelopmentEmulator=true`, which is what makes the SDKs use plain AMQP on
+the port you give. A connection string without the flag and without a port
+makes the SDK dial 5671; see
+[Connecting without `UseDevelopmentEmulator`](../../docs/usage.md#connecting-without-usedevelopmentemulator).
 
 | File | Setup |
 | --- | --- |

@@ -41,7 +41,7 @@ configurable.
 
 Download the binary for your platform from the
 [Releases page](https://github.com/igorcesarcode/open-service-bus-emulador/releases)
-(*placeholder: the first release is not published yet*), or use Docker, or build
+or use Docker, or build
 from source. The [installation guide](docs/installation.md) has the details for
 Windows, Linux, macOS, Docker and `go install`.
 
@@ -57,9 +57,9 @@ Windows, Linux, macOS, Docker and `go install`.
 
 ### Docker
 
-> The image `ghcr.io/igorcesarcode/open-service-bus-emulador` is a placeholder
-> until it is published. Until then build it yourself:
-> `make image IMAGE=open-service-bus:local`.
+> The image is `ghcr.io/igorcesarcode/open-service-bus-emulador`: `latest`
+> follows `main`, and each release has its version tag (`1.0.0`). To build it
+> yourself: `make image IMAGE=open-service-bus:local`.
 
 Everything the command line does can be done with `OSB_*` environment
 variables, which is how you configure a container:

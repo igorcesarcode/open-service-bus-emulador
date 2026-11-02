@@ -134,11 +134,58 @@ Complete programs are in [`examples/`](../examples/README.md).
 ### Connecting without `UseDevelopmentEmulator`
 
 Clients can also connect as they do to Azure, over TLS, using a
-`<namespace>.servicebus.windows.net` style host. The TLS certificate is
-self-signed: either pass it to the client (`-tls-cert-out cert.pem`, then
-for Node `NODE_EXTRA_CA_CERTS=cert.pem`) or give the emulator your own with
-`-tls-cert` and `-tls-key`. Use `-tls-hosts` to add names to the generated
-certificate. The project's own test suite verifies this mode too.
+`<namespace>.servicebus.windows.net` style host. The flag changes how the SDK
+connects, not only what it trusts:
+
+| | With `UseDevelopmentEmulator=true` | Without it |
+| --- | --- | --- |
+| AMQP transport | plain, no TLS | TLS |
+| Port when the `Endpoint` has none | the SDK's emulator default | **5671** |
+| Management API (admin clients) | plain HTTP (JavaScript 7.10+), see above | HTTPS, **443** when the `Endpoint` has no port |
+| Certificate | not used | self-signed, so it must be trusted |
+
+**The port is the usual trap.** The emulator listens on 5672 by default. An
+`Endpoint=sb://localhost` without the flag makes the SDK dial 5671, where
+nothing listens: the connection is refused, and since the SDKs retry, an
+application looks stuck rather than failed. A Compose file that publishes only
+5672 has the same problem for any application that leaves the port out. Pick
+one of two fixes:
+
+1. **Name the port in the `Endpoint`**: `Endpoint=sb://localhost:5672/;...`.
+   The SDK then dials that port with TLS, and the emulator answers TLS on the
+   same port as everything else.
+2. **Listen on the real ports** and leave the `Endpoint` as Azure writes it:
+   `-amqp-addr :5671 -http-addr :443` (`OSB_AMQP_ADDR`, `OSB_HTTP_ADDR`),
+   publishing `5671` and `443`. Port 443 needs privileges outside a container.
+   `-listen` keeps working next to them, so tools that use 5672 are unaffected.
+
+```yaml
+services:
+  servicebus:
+    image: ghcr.io/igorcesarcode/open-service-bus-emulador:latest
+    environment:
+      OSB_QUEUE: orders
+      OSB_AMQP_ADDR: ":5671"          # only for clients that leave the port out
+      OSB_HTTP_ADDR: ":443"
+      OSB_TLS_HOSTS: servicebus       # the name the other containers use
+      OSB_TLS_CERT_OUT: /certs/cert.pem
+    ports: ["5672:5672", "5671:5671", "443:443"]
+    volumes: ["certs:/certs"]
+volumes:
+  certs:
+```
+
+The certificate is self-signed: either pass it to the client
+(`-tls-cert-out cert.pem`, then for Node `NODE_EXTRA_CA_CERTS=cert.pem`) or
+give the emulator your own with `-tls-cert` and `-tls-key`. The host name the
+client uses must be in the certificate: `localhost` and the machine's names
+are there already, and `-tls-hosts` adds others, such as a Compose service
+name. Without trust the client fails with `self-signed certificate` (Node),
+`x509: certificate signed by unknown authority` (Go) or a remote certificate
+error (.NET).
+
+Both fixes were checked with the JavaScript SDK doing a send and a receive over
+TLS; the project's own test suite also runs this mode against the real ports.
 
 ### From another machine or container
 

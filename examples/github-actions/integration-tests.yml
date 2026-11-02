@@ -8,7 +8,7 @@ name: integration-tests
 on: [push, pull_request]
 
 env:
-  OSB_VERSION: vX.Y.Z   # placeholder
+  OSB_VERSION: v1.0.0   # a release of the repository
 
 jobs:
   # Option A: download the single binary and run it in the background.
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       servicebus:
-        image: ghcr.io/igorcesarcode/open-service-bus-emulador:latest   # placeholder
+        image: ghcr.io/igorcesarcode/open-service-bus-emulador:latest
         ports:
           - 5672:5672
         # Arguments of the service container are not supported by `services`;

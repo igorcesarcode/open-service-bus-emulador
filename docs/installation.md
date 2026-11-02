@@ -11,16 +11,20 @@ open-service-bus is a single static binary named `open-service-bus`
 
 ## Download a release
 
-> **Placeholder.** Releases are not published yet. When they are, they will
-> be at <https://github.com/igorcesarcode/open-service-bus-emulador/releases>.
-> Each release contains one binary per platform and a `SHA256SUMS` file.
+Releases are at <https://github.com/igorcesarcode/open-service-bus-emulador/releases>.
+Each one contains one binary per platform and a `SHA256SUMS` file.
+
+> While the repository is private, `curl` gets a 404 for the download URLs.
+> Use the GitHub CLI, which is logged in: `gh release download v1.0.0 -R
+> igorcesarcode/open-service-bus-emulador -p 'open-service-bus-v1.0.0-linux-amd64'`
+> (then `chmod +x`), or `-p '*'` for everything including `SHA256SUMS`.
 
 Release assets are named `open-service-bus-<version>-<os>-<arch>[.exe]`.
 
 ### Linux
 
 ```bash
-VERSION=vX.Y.Z   # placeholder: pick a version from the releases page
+VERSION=v1.0.0   # pick a version from the releases page
 ARCH=amd64       # or arm64
 curl -L -o open-service-bus \
   "https://github.com/igorcesarcode/open-service-bus-emulador/releases/download/${VERSION}/open-service-bus-${VERSION}-linux-${ARCH}"
@@ -32,7 +36,7 @@ open-service-bus -version
 ### macOS
 
 ```bash
-VERSION=vX.Y.Z   # placeholder
+VERSION=v1.0.0
 ARCH=arm64       # arm64 for Apple Silicon, amd64 for Intel
 curl -L -o open-service-bus \
   "https://github.com/igorcesarcode/open-service-bus-emulador/releases/download/${VERSION}/open-service-bus-${VERSION}-darwin-${ARCH}"
@@ -48,7 +52,7 @@ Privacy & Security*).
 ### Windows (PowerShell)
 
 ```powershell
-$Version = "vX.Y.Z"   # placeholder
+$Version = "v1.0.0"
 $Arch = "amd64"       # or arm64
 Invoke-WebRequest -OutFile open-service-bus.exe `
   "https://github.com/igorcesarcode/open-service-bus-emulador/releases/download/$Version/open-service-bus-$Version-windows-$Arch.exe"
@@ -72,12 +76,17 @@ shasum -a 256 -c SHA256SUMS --ignore-missing  # macOS
 
 ## Container image
 
-> **Placeholder.** The image is not published yet. It is planned for the
-> GitHub Container Registry as
-> `ghcr.io/igorcesarcode/open-service-bus-emulador`.
+The image is published on the GitHub Container Registry as
+`ghcr.io/igorcesarcode/open-service-bus-emulador`: `latest` follows `main`, and
+each release has its version (`1.0.0`, `1.0`) for linux/amd64 and linux/arm64.
+If the package is private, log in first with a token that has `read:packages`:
+`echo $TOKEN | docker login ghcr.io -u <user> --password-stdin`.
 
 The image holds only the static binary (`FROM scratch`) and exposes port 5672,
 which carries AMQP, AMQP over WebSocket, the management API and the portal.
+Clients that connect **without** `UseDevelopmentEmulator` and name no port dial
+5671 (and 443 for the management API); see
+[Connecting without `UseDevelopmentEmulator`](usage.md#connecting-without-usedevelopmentemulator).
 Configure it with `OSB_*` environment variables (every flag has one; see
 [Configuration](configuration.md#environment-variables)) or with arguments.
 
