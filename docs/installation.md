@@ -14,17 +14,17 @@ open-service-bus is a single static binary named `open-service-bus`
 Releases are at <https://github.com/igorcesarcode/open-service-bus-emulador/releases>.
 Each one contains one binary per platform and a `SHA256SUMS` file.
 
-> While the repository is private, `curl` gets a 404 for the download URLs.
-> Use the GitHub CLI, which is logged in: `gh release download v1.0.0 -R
-> igorcesarcode/open-service-bus-emulador -p 'open-service-bus-v1.0.0-linux-amd64'`
-> (then `chmod +x`), or `-p '*'` for everything including `SHA256SUMS`.
+With the GitHub CLI, `gh release download v1.1.1 -R
+igorcesarcode/open-service-bus-emulador -p 'open-service-bus-v1.1.1-linux-amd64'`
+downloads one binary (then `chmod +x`); `-p '*'` downloads everything,
+including `SHA256SUMS`.
 
 Release assets are named `open-service-bus-<version>-<os>-<arch>[.exe]`.
 
 ### Linux
 
 ```bash
-VERSION=v1.0.0   # pick a version from the releases page
+VERSION=v1.1.1   # pick a version from the releases page
 ARCH=amd64       # or arm64
 curl -L -o open-service-bus \
   "https://github.com/igorcesarcode/open-service-bus-emulador/releases/download/${VERSION}/open-service-bus-${VERSION}-linux-${ARCH}"
@@ -36,7 +36,7 @@ open-service-bus -version
 ### macOS
 
 ```bash
-VERSION=v1.0.0
+VERSION=v1.1.1
 ARCH=arm64       # arm64 for Apple Silicon, amd64 for Intel
 curl -L -o open-service-bus \
   "https://github.com/igorcesarcode/open-service-bus-emulador/releases/download/${VERSION}/open-service-bus-${VERSION}-darwin-${ARCH}"
@@ -52,7 +52,7 @@ Privacy & Security*).
 ### Windows (PowerShell)
 
 ```powershell
-$Version = "v1.0.0"
+$Version = "v1.1.1"
 $Arch = "amd64"       # or arm64
 Invoke-WebRequest -OutFile open-service-bus.exe `
   "https://github.com/igorcesarcode/open-service-bus-emulador/releases/download/$Version/open-service-bus-$Version-windows-$Arch.exe"
@@ -79,8 +79,7 @@ shasum -a 256 -c SHA256SUMS --ignore-missing  # macOS
 The image is published on the GitHub Container Registry as
 `ghcr.io/igorcesarcode/open-service-bus-emulador`: `latest` follows `main`, and
 each release has its version (`1.0.0`, `1.0`) for linux/amd64 and linux/arm64.
-If the package is private, log in first with a token that has `read:packages`:
-`echo $TOKEN | docker login ghcr.io -u <user> --password-stdin`.
+It is public, so `docker pull` needs no login.
 
 The image holds only the static binary (`FROM scratch`) and exposes port 5672,
 which carries AMQP, AMQP over WebSocket, the management API and the portal.
