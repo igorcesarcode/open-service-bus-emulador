@@ -452,9 +452,8 @@ type Counts struct {
 // CountMessages counts the messages of an entity by sub-queue and state.
 func (t *Tx) CountMessages(entityID int64) (Counts, error) {
 	var c Counts
-	// The groups are read from the index; the size is kept by triggers, so
-	// the payloads need not be read.
-	rows, err := t.query(`SELECT subqueue, state, COUNT(*) FROM messages WHERE entity_id = +? GROUP BY subqueue, state`, entityID)
+	// The counts and the size are kept by triggers, so no message is read.
+	rows, err := t.query(`SELECT subqueue, state, n FROM entity_counts WHERE entity_id = ? AND n > 0`, entityID)
 	if err != nil {
 		return c, err
 	}
