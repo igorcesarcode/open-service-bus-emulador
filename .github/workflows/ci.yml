@@ -26,6 +26,32 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
 
+  # @azure/service-bus 7.9.5 ignores UseDevelopmentEmulator for the management
+  # API and always uses HTTPS; this keeps the documented workaround working.
+  node-legacy-admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: go build -o open-service-bus ./cmd/open-service-bus
+      - run: npm ci
+        working-directory: test/node-legacy
+      - name: Administration client over HTTPS
+        working-directory: test/node-legacy
+        run: |
+          ../../open-service-bus -listen 127.0.0.1:5672 -tls-cert-out "$PWD/cert.pem" &
+          pid=$!
+          for i in $(seq 1 50); do [ -s cert.pem ] && break; sleep 0.2; done
+          NODE_EXTRA_CA_CERTS="$PWD/cert.pem" npm test
+          status=$?
+          kill $pid
+          exit $status
+
   # The image holds the Linux binaries compressed with UPX. Every push builds
   # it and starts it, so a binary that UPX broke is caught here; a push to main
   # (latest and the commit sha) or a tag (the version) publishes it to ghcr.

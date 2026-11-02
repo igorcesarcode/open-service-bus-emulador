@@ -95,7 +95,8 @@ management API, and how they do it depends on the SDK:
 
 | SDK | Administration client in emulator mode |
 | --- | --- |
-| JavaScript | plain HTTP on the connection string's port; nothing to configure |
+| JavaScript, `@azure/service-bus` 7.10.0 or newer | plain HTTP on the connection string's port; nothing to configure |
+| JavaScript, 7.9.5 and older | always HTTPS, like Go: the SDK ignores `UseDevelopmentEmulator` for the management API. Trust the certificate: `-tls-cert-out cert.pem` on the emulator and `NODE_EXTRA_CA_CERTS=cert.pem` for Node (or give the emulator your own `-tls-cert`/`-tls-key`). Without it the client fails with `self-signed certificate`. Updating the SDK is simpler |
 | Go | always HTTPS; the certificate is self-signed, so pass an HTTP transport that skips verification (or trusts the certificate written by `-tls-cert-out`) |
 | .NET | always HTTPS on port 443; pass a transport that trusts the certificate and sends the requests to the emulator's port |
 
@@ -116,6 +117,9 @@ adminClient, err := admin.NewClientFromConnectionString(cs, &admin.ClientOptions
 const client = new ServiceBusClient(cs);
 const admin = new ServiceBusAdministrationClient(cs);
 ```
+
+With `@azure/service-bus` 7.9.5 or older, start the emulator with
+`-tls-cert-out cert.pem` and run Node with `NODE_EXTRA_CA_CERTS=cert.pem`.
 
 ### .NET
 

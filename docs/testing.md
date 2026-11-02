@@ -10,7 +10,7 @@ guards against regressions.
 | --- | --- | --- |
 | Unit tests | `internal/...` | AMQP codec, broker, SQL filter language, Terraform reader, config, auth, portal, MCP |
 | Go SDK integration | `test/integration` | `github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus`, including the `admin` client, against the emulator started in process or as the real binary |
-| JavaScript SDK | `test/node`, run by `TestNodeSDK` | `@azure/service-bus` (messaging and `ServiceBusAdministrationClient`) |
+| JavaScript SDK | `test/node`, run by `TestNodeSDK` | `@azure/service-bus` 7.10.0 (messaging and `ServiceBusAdministrationClient`); `test/node-legacy` checks the administration client of 7.9.5 over HTTPS in CI |
 | .NET SDK | `test/dotnet`, run by `TestDotnetSDK` | `Azure.Messaging.ServiceBus`, the same scenarios plus transactions and batch delete; runs when `dotnet` (or Docker) is available |
 | MCP | `test/integration/mcp_test.go`, `test/node/mcp.test.mjs` | the MCP server with a minimal client and the official `@modelcontextprotocol/sdk` |
 | End-to-end | `test/e2e` | the binary runs as a separate process (and optionally in Docker) and mini-services written in Go and in JavaScript talk to each other **through it**, in every combination (Go↔Go, Go↔JS, JS↔Go, JS↔JS) |
