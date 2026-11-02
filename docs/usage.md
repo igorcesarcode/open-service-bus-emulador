@@ -52,6 +52,7 @@ Run `open-service-bus -help` for every flag.
 | `-metrics-retention` | `720h` | How long metrics and the activity log are kept |
 | `-mcp-addr`, `-mcp-readonly`, `-mcp-allow-data` | off | [MCP server](MCP.md) (also `OSB_MCP_*` environment variables) |
 | `-log-level` | `info` | `debug`, `info`, `warn`, `error` |
+| `-log-events` | off | One short line on stdout for each message event; see [Following the messages](#following-the-messages) |
 | `-pprof` | off | Serve Go profiling on this address, such as `localhost:6060` |
 | `-version` | | Print the version and exit |
 
@@ -218,7 +219,47 @@ has Manage.
 - The portal shows time series (requests, messages in and out, sizes,
   connections).
 - `-log-level debug` logs protocol-level detail.
+- `-log-events` logs what happens to each message; see below.
 - `-pprof localhost:6060` exposes Go profiling data.
+
+### Following the messages
+
+`-log-events` writes one line to stdout for each thing that happens to a
+message, so you can follow a flow without a debugger or a tracing backend:
+
+```
+11:35:33.334 send         events seq=1 bytes=76 id=order-1
+11:35:33.334 filter       events/Subscriptions/big rule=big matched=true id=order-1 filter="quantity > 10"
+11:35:33.334 enqueue      events/Subscriptions/big seq=1 bytes=76 id=order-1
+11:35:33.341 receive      events/Subscriptions/big seq=1 id=order-1 lock=c536782f delivery=1 mode=peek-lock subqueue=active
+11:35:33.347 abandon      events/Subscriptions/big seq=1 id=order-1 delivery=1
+11:35:33.350 dead-letter  events/Subscriptions/big seq=1 id=order-1 reason=Poison delivery=2
+```
+
+| Event | When |
+| --- | --- |
+| `send` | A message was accepted on a queue or topic (`scheduled=` for a scheduled one) |
+| `filter` | A subscription rule was evaluated: its name, the SQL filter, `matched=` and `error=` if it failed |
+| `enqueue` | A copy was stored on a subscription, or on the destination of a forward |
+| `forward` | A message was passed on to the entity in `ForwardTo` |
+| `duplicate` | A message was dropped by duplicate detection |
+| `receive` | A message was delivered: the start of its lock token, the delivery count, `mode=peek-lock` or `receive-and-delete` |
+| `complete`, `abandon`, `release`, `defer` | The receiver settled a message |
+| `dead-letter` | A message moved to the dead-letter queue, with the `reason=` |
+| `expire` | A message's time to live passed |
+| `activate` | A scheduled message became available |
+| `lock-expired` | Locks lapsed and their messages became available again |
+| `renew-lock`, `cancel-scheduled` | Other operations on locked or scheduled messages |
+
+`entity` is the queue, or `topic/Subscriptions/name`; `seq` is the sequence
+number and `id` the MessageId, the same values the SDKs show. With more than
+one namespace each line also has `ns=`. A line is written once the change is
+committed, so a rolled-back operation leaves none.
+
+The lines never include the body or the properties of a message, and they go
+to stdout, apart from the diagnostics on stderr (`-log-level`). Redirect them
+to a file, or `grep id=order-1` for the history of one message. The same
+information, with timings, is available as traces with `-otel-endpoint`.
 
 ## Export the current state
 

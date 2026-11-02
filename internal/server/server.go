@@ -46,6 +46,10 @@ type Options struct {
 	MaxMessageSize uint64
 	// Logger receives diagnostics. Nil disables logging.
 	Logger *slog.Logger
+	// Events, if set, receives one record for each thing that happens to a
+	// message (see package eventlog). With more than one namespace each
+	// record has an ns attribute.
+	Events *slog.Logger
 	// Namespace is the name of the default namespace, which serves every
 	// hostname that names no other. Empty means "emulator". Queues, Topics,
 	// Policies and Assignments below declare its entities.

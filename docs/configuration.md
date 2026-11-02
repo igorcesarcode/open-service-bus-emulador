@@ -218,6 +218,7 @@ turned into underscores: `-max-message-size` is `OSB_MAX_MESSAGE_SIZE`.
 | `OSB_OTEL_METRIC_INTERVAL` | `-otel-metric-interval` | `10s` | Metric export interval |
 | `OSB_OTEL_SERVICE_NAME` | `-otel-service-name` | `open-service-bus` | `service.name` |
 | `OSB_LOG_LEVEL` | `-log-level` | `info` | `debug`, `info`, `warn`, `error` |
+| `OSB_LOG_EVENTS` | `-log-events` | `false` | One line on stdout for each message event (send, filter, receive, complete, abandon, dead-letter...), without the body |
 | `OSB_PPROF` | `-pprof` | off | Profiling address. `localhost:6060` |
 
 `-version` has no variable. Terraform also reads its own `TF_VAR_<name>`

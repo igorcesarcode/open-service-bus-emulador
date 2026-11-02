@@ -27,6 +27,10 @@ type Options struct {
 	Now func() time.Time
 	// Logger receives diagnostics. Nil disables logging.
 	Logger *slog.Logger
+	// Events, if set, receives one record for each thing that happens to a
+	// message: sent, routed, received, settled, dead-lettered, expired. See
+	// events.go.
+	Events *slog.Logger
 	// OnDelete, if set, is called with the path of each queue or topic
 	// after it is deleted, for state kept elsewhere such as its shared
 	// access policies.
@@ -47,6 +51,8 @@ type Broker struct {
 	store *store.Ref
 	now   func() time.Time
 	log   *slog.Logger
+	// events is nil unless Options.Events is set.
+	events *slog.Logger
 
 	// adminMu serializes entity creation, updates and deletion. It is
 	// held across the store write, so it must never be taken inside a
@@ -106,6 +112,7 @@ func New(ctx context.Context, st *store.Store, opts Options) (*Broker, error) {
 		store:    store.NewRef(st),
 		now:      opts.Now,
 		log:      opts.Logger,
+		events:   opts.Events,
 		entities: make(map[string]*Entity),
 		byID:     make(map[int64]*Entity),
 		rules:    make(map[int64][]*compiledRule),

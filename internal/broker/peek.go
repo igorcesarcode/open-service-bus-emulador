@@ -100,6 +100,7 @@ func (b *Broker) cancelScheduled(ctx context.Context, addr Address, seqs []int64
 				if err := tx.DeleteMessage(m.ID); err != nil {
 					return err
 				}
+				b.emit(tx, "cancel-scheduled", storedAttrs(t, m)...)
 			}
 		}
 		return nil
