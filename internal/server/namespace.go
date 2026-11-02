@@ -101,8 +101,12 @@ func (s *Server) newNamespace(ctx context.Context, no NamespaceOptions, dbPath s
 			return fail(fmt.Errorf("role assignment of %s: %w", a.Principal, err))
 		}
 	}
+	events := s.opts.Events
+	if events != nil && len(s.opts.Namespaces) > 0 {
+		events = events.With("ns", no.Name)
+	}
 	n.broker, err = broker.New(ctx, st, broker.Options{
-		Now: s.opts.Now, Logger: s.logger(), MetricsRetention: s.opts.MetricsRetention, OnDelete: n.auth.DeleteScope,
+		Now: s.opts.Now, Logger: s.logger(), Events: events, MetricsRetention: s.opts.MetricsRetention, OnDelete: n.auth.DeleteScope,
 		MaxBatchDelete: s.opts.MaxBatchDelete, Partitions: s.opts.Partitions,
 	})
 	if err != nil {

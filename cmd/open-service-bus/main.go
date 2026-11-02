@@ -54,6 +54,7 @@ import (
 
 	"github.com/igorcesarcode/open-service-bus-emulador/internal/auth"
 	"github.com/igorcesarcode/open-service-bus-emulador/internal/config"
+	"github.com/igorcesarcode/open-service-bus-emulador/internal/eventlog"
 	"github.com/igorcesarcode/open-service-bus-emulador/internal/export"
 	"github.com/igorcesarcode/open-service-bus-emulador/internal/mcp"
 	"github.com/igorcesarcode/open-service-bus-emulador/internal/server"
@@ -128,6 +129,7 @@ func run(args []string) error {
 	otelInterval := fs.Duration("otel-metric-interval", 10*time.Second, "with -otel-endpoint, how often metrics are exported")
 	otelService := fs.String("otel-service-name", "open-service-bus", "with -otel-endpoint, the service.name of the telemetry")
 	logLevel := fs.String("log-level", "info", "log level: debug, info, warn or error")
+	logEvents := fs.Bool("log-events", false, "log one short line to stdout for each message event (send, filter, receive, complete, abandon, dead-letter, expire...), with ids and sizes but never the message body")
 	tlsCert := fs.String("tls-cert", "", "PEM certificate for TLS connections; empty generates a self-signed one")
 	tlsKey := fs.String("tls-key", "", "PEM private key of -tls-cert")
 	tlsCertOut := fs.String("tls-cert-out", "", "file to write the TLS certificate to, for clients to trust")
@@ -182,6 +184,9 @@ func run(args []string) error {
 	}
 
 	opts := server.Options{Addr: *listen, AMQPAddr: *amqpAddr, HTTPAddr: *httpAddr, DBPath: *dbPath, MaxMessageSize: *maxMessageSize, MaxBatchDelete: *maxBatchDelete, TxnTimeout: *txnTimeout, Partitions: *partitions, DisablePortal: !*portalOn, Version: version, Prometheus: *prometheus, MetricsRetention: *metricsRetention, Logger: logger}
+	if *logEvents {
+		opts.Events = eventlog.New(os.Stdout)
+	}
 	entities := &config.Config{}
 	if *tfPath != "" {
 		var moduleMap map[string]terraform.ModuleLists

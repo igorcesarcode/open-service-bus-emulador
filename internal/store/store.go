@@ -332,7 +332,7 @@ func (s *Store) commitGroup(group []*writeReq) {
 		return
 	}
 	var all []Stmt
-	var ran []*Tx
+	var ran, okTx []*Tx
 	var okIdx []int
 	bound := map[string]*sql.Stmt{}
 	for _, i := range live {
@@ -366,6 +366,7 @@ func (s *Store) commitGroup(group []*writeReq) {
 			continue
 		}
 		okIdx = append(okIdx, i)
+		okTx = append(okTx, t)
 		ran = append(ran, t)
 		all = append(all, stmts...)
 	}
@@ -389,6 +390,11 @@ func (s *Store) commitGroup(group []*writeReq) {
 		return
 	}
 	s.cacheAll(ran)
+	for _, t := range okTx {
+		for _, fn := range t.after {
+			fn()
+		}
+	}
 	if repl == nil || len(all) == 0 {
 		return
 	}
@@ -437,6 +443,9 @@ func (s *Store) run(ctx context.Context, db *sql.DB, readOnly bool, fn func(*Tx)
 		return fmt.Errorf("store: commit: %w", err)
 	}
 	t.cacheMisses()
+	for _, fn := range t.after {
+		fn()
+	}
 	return nil
 }
 
@@ -455,7 +464,18 @@ type Tx struct {
 	misses []string
 	// stmtCount is the number of statements that changed the database.
 	stmtCount int
+	// after are run once the transaction has committed.
+	after []func()
 }
+
+// AfterCommit schedules fn to run after the transaction commits. It does
+// not run if the transaction fails or is rolled back, and it runs on the
+// goroutine that commits, so it must be quick and must not write.
+func (t *Tx) AfterCommit(fn func()) { t.after = append(t.after, fn) }
+
+// AfterCommitFirst is AfterCommit for a function that must run before the
+// ones already scheduled.
+func (t *Tx) AfterCommitFirst(fn func()) { t.after = append([]func(){fn}, t.after...) }
 
 // exec runs a statement that changes the database, and records it when the
 // store replicates.

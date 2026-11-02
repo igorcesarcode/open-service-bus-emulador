@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"go.opentelemetry.io/otel/attribute"
+	"log/slog"
 	"time"
 
 	"github.com/igorcesarcode/open-service-bus-emulador/internal/store"
@@ -123,6 +124,11 @@ func (b *Broker) processTimers(ctx context.Context, last, now int64) (int64, err
 				if err := tx.ActivateMessage(m); err != nil {
 					return err
 				}
+				if b.eventsOn() {
+					if e := entities[m.EntityID]; e != nil {
+						b.emit(tx, "activate", storedAttrs(e, m)...)
+					}
+				}
 				changed = append(changed, m.EntityID)
 			}
 			expired, err := tx.Expired(now, timerBatch)
@@ -153,6 +159,9 @@ func (b *Broker) processTimers(ctx context.Context, last, now int64) (int64, err
 				return err
 			}
 			changed = append(changed, released...)
+			if n > 0 {
+				b.emit(tx, "lock-expired", slog.Int("count", n))
+			}
 			nDue += len(due)
 			nExpired += len(expired)
 			nUnlocked += n

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"log/slog"
 	"time"
 
 	"github.com/igorcesarcode/open-service-bus-emulador/internal/amqp/encoding"
@@ -201,6 +202,10 @@ func (b *Broker) doReceive(ctx context.Context, addr Address, max int, mode Rece
 				if err := tx.LockMessage(m); err != nil {
 					return err
 				}
+				if b.eventsOn() {
+					b.emit(tx, "receive", append(storedAttrs(e, m), lockAttr(token[:]),
+						slog.Int("delivery", m.DeliveryCount), slog.String("mode", modeName(mode)), slog.String("subqueue", subqueueName(addr.Subqueue)))...)
+				}
 				out = append(out, newDelivery(addr, m))
 			}
 		}
@@ -232,6 +237,7 @@ func (b *Broker) prepareDelivery(tx *store.Tx, e *Entity, sq Subqueue, m *store.
 // expire removes a message whose time to live has passed, dead-lettering
 // it when the entity asks for that.
 func (b *Broker) expire(tx *store.Tx, e *Entity, m *store.Message, changed *[]int64) error {
+	b.emit(tx, "expire", storedAttrs(e, m)...)
 	telemetry.Add(context.Background(), telemetry.MessagesExpired, 1, telemetry.Entity(e.DisplayPath()))
 	if e.Properties.DeadLetteringOnMessageExpiration {
 		return b.deadLetter(tx, e, m, ReasonTTLExpired, "The message expired and was dead lettered.", nil, changed)
@@ -242,6 +248,9 @@ func (b *Broker) expire(tx *store.Tx, e *Entity, m *store.Message, changed *[]in
 // deadLetter moves m to the dead-letter queue of e, recording the reason
 // in the message's application properties as Service Bus does.
 func (b *Broker) deadLetter(tx *store.Tx, e *Entity, m *store.Message, reason, desc string, props encoding.Map, changed *[]int64) error {
+	if b.eventsOn() {
+		b.emit(tx, "dead-letter", append(storedAttrs(e, m), slog.String("reason", reason), slog.Int("delivery", m.DeliveryCount))...)
+	}
 	telemetry.Add(context.Background(), telemetry.MessagesDeadLettered, 1, telemetry.Entity(e.DisplayPath()), attribute.String("reason", reason))
 	payload, err := frames.RewriteMessage(m.Payload, func(env *frames.Envelope) error {
 		applyProperties(env, props)
@@ -377,6 +386,9 @@ func (b *Broker) settleFn(addr Address, s Settlement) func(tx *store.Tx, e *Enti
 				held := time.Duration(b.nowMillis()-(m.LockedUntil-e.Properties.LockDuration.Milliseconds())) * time.Millisecond
 				telemetry.Seconds(ctx, telemetry.LockHeld, held)
 			}
+		}
+		if b.eventsOn() && s.Kind != SettleDeadLetter {
+			b.emit(tx, settleName(s.Kind), append(storedAttrs(e, m), slog.Int("delivery", m.DeliveryCount))...)
 		}
 		switch s.Kind {
 		case SettleComplete:
@@ -515,6 +527,7 @@ func (b *Broker) renewLocks(ctx context.Context, addr Address, tokens []LockToke
 			}
 			out[i] = time.UnixMilli(m.LockedUntil).UTC()
 		}
+		b.emit(tx, "renew-lock", slog.String("entity", e.DisplayPath()), slog.Int("count", len(tokens)))
 		return nil
 	})
 	if err != nil {
@@ -523,4 +536,36 @@ func (b *Broker) renewLocks(ctx context.Context, addr Address, tokens []LockToke
 	// A renewed lock expires later than the deadline the timer loop waits
 	// for, so there is nothing to recompute.
 	return out, nil
+}
+
+func modeName(m ReceiveMode) string {
+	if m == ReceiveAndDelete {
+		return "receive-and-delete"
+	}
+	return "peek-lock"
+}
+
+func subqueueName(sq Subqueue) string {
+	switch sq {
+	case SubqueueDeadLetter:
+		return "dead-letter"
+	case SubqueueTransferDLQ:
+		return "transfer-dead-letter"
+	}
+	return "active"
+}
+
+// settleName is the event for a settlement.
+func settleName(k SettleKind) string {
+	switch k {
+	case SettleComplete:
+		return "complete"
+	case SettleAbandon:
+		return "abandon"
+	case SettleRelease:
+		return "release"
+	case SettleDefer:
+		return "defer"
+	}
+	return "dead-letter"
 }

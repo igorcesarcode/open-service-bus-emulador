@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -117,6 +118,9 @@ func (b *Broker) Send(ctx context.Context, address string, msgs []IncomingMessag
 		ec = b.newEnqueueCtx(tx)
 		var err error
 		seqs, err = b.enqueueAll(ec, e, msgs)
+		if err == nil && b.eventsOn() {
+			b.sentEvents(tx, e, msgs, seqs)
+		}
 		return err
 	})
 	if err != nil {
@@ -296,6 +300,7 @@ func (b *Broker) enqueue(c *enqueueCtx, e *Entity, m *outgoing, hops int) (int64
 	if dup, err := c.duplicate(e, m); err != nil || dup {
 		if dup {
 			c.duplicates++
+			b.emit(c.tx, "duplicate", slog.String("entity", e.DisplayPath()), slog.String("id", m.MessageID))
 		}
 		return 0, err
 	}
@@ -385,6 +390,19 @@ func (b *Broker) route(c *enqueueCtx, sr *subRoute, m *outgoing, seq int64) ([]*
 	)
 	for _, r := range sr.rules {
 		ok, err := r.match(view)
+		if b.eventsOn() {
+			a := []any{slog.String("entity", sr.e.DisplayPath()), slog.String("rule", r.Name), slog.Bool("matched", ok && err == nil)}
+			if m.MessageID != "" {
+				a = append(a, slog.String("id", m.MessageID))
+			}
+			if r.Filter.Kind == FilterSQL {
+				a = append(a, slog.String("filter", r.Filter.SQL))
+			}
+			if err != nil {
+				a = append(a, slog.String("error", err.Error()))
+			}
+			b.emit(c.tx, "filter", a...)
+		}
 		if err != nil {
 			evalErr = err
 			continue
@@ -473,6 +491,16 @@ func (b *Broker) insert(c *enqueueCtx, via, target *Entity, m *outgoing, seq int
 	if err := c.tx.InsertMessage(row); err != nil {
 		return err
 	}
+	if target != via {
+		a := []any{slog.String("entity", target.DisplayPath()), slog.Int64("seq", b.publicSeq(row.Partition, seq)), slog.Int("bytes", len(m.Payload))}
+		if m.MessageID != "" {
+			a = append(a, slog.String("id", m.MessageID))
+		}
+		if state == store.StateScheduled {
+			a = append(a, slog.Time("scheduled", visible.UTC()))
+		}
+		b.emit(c.tx, "enqueue", a...)
+	}
 	c.addSize(target.id, len(m.Payload))
 	c.timed = c.timed || row.ExpiresAt != 0
 	c.changed = append(c.changed, target.id)
@@ -497,6 +525,7 @@ func (b *Broker) forward(c *enqueueCtx, src *Entity, m *outgoing, hops int) (int
 	if target == nil {
 		return 0, b.deadLetterNew(c, src, m, code, desc)
 	}
+	b.emit(c.tx, "forward", slog.String("entity", src.DisplayPath()), slog.String("to", target.DisplayPath()), slog.String("id", m.MessageID))
 	return b.enqueue(c, target, m, hops+1)
 }
 
@@ -578,6 +607,7 @@ func (b *Broker) deadLetterNew(c *enqueueCtx, e *Entity, m *outgoing, reason, de
 // and description in its application properties.
 func (b *Broker) parkNew(c *enqueueCtx, e *Entity, m *outgoing, subqueue int, reason, desc string) (int64, error) {
 	if subqueue == store.SubqueueDeadLetter {
+		b.emit(c.tx, "dead-letter", slog.String("entity", e.DisplayPath()), slog.String("id", m.MessageID), slog.String("reason", reason))
 		telemetry.Add(context.Background(), telemetry.MessagesDeadLettered, 1, telemetry.Entity(e.DisplayPath()), attribute.String("reason", reason))
 	}
 	payload, err := frames.RewriteMessage(m.Payload, func(env *frames.Envelope) error {

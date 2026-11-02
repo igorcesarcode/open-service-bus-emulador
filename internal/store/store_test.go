@@ -992,3 +992,29 @@ func BenchmarkInsertDeleteMessage(b *testing.B) {
 		}
 	}
 }
+
+func TestAfterCommitRunsOnlyOnCommit(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(ctx, Memory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	var ran []string
+	if err := s.Write(ctx, func(tx *Tx) error {
+		tx.AfterCommit(func() { ran = append(ran, "committed") })
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	failed := errors.New("rolled back")
+	if err := s.Write(ctx, func(tx *Tx) error {
+		tx.AfterCommit(func() { ran = append(ran, "rolled back") })
+		return failed
+	}); !errors.Is(err, failed) {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if len(ran) != 1 || ran[0] != "committed" {
+		t.Errorf("AfterCommit ran %v, want only [committed]", ran)
+	}
+}
