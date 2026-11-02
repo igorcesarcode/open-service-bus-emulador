@@ -811,3 +811,184 @@ func TestPurgeMessageIDsInBatches(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// scanCounts counts by reading every message, which is what CountMessages did
+// before the counts were kept by triggers.
+func scanCounts(tx *Tx, entityID int64) (map[[2]int64]int64, error) {
+	rows, err := tx.query(`SELECT subqueue, state, COUNT(*) FROM messages WHERE entity_id = ? GROUP BY subqueue, state`, entityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[[2]int64]int64{}
+	for rows.Next() {
+		var sq, st, n int64
+		if err := rows.Scan(&sq, &st, &n); err != nil {
+			return nil, err
+		}
+		out[[2]int64{sq, st}] = n
+	}
+	return out, rows.Err()
+}
+
+func TestEntityCountsFollowMessages(t *testing.T) {
+	for name, s := range openStores(t) {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			a := &Entity{Kind: "queue", Path: "a", Name: "A", Props: []byte("{}")}
+			b := &Entity{Kind: "queue", Path: "b", Name: "B", Props: []byte("{}")}
+			var ms []*Message
+			check := func(step string) {
+				t.Helper()
+				err := s.Read(ctx, func(tx *Tx) error {
+					for _, e := range []*Entity{a, b} {
+						want, err := scanCounts(tx, e.ID)
+						if err != nil {
+							return err
+						}
+						c, err := tx.CountMessages(e.ID)
+						if err != nil {
+							return err
+						}
+						got := Counts{}
+						got.Active, got.DeadLetter = want[[2]int64{SubqueueActive, StateActive}], want[[2]int64{SubqueueDeadLetter, StateActive}]
+						got.Scheduled, got.Deferred = want[[2]int64{SubqueueActive, StateScheduled}], want[[2]int64{SubqueueActive, StateDeferred}]
+						got.TransferDeadLetter = want[[2]int64{SubqueueTransferDLQ, StateActive}]
+						got.SizeBytes = c.SizeBytes
+						if c != got {
+							t.Errorf("%s: %s: CountMessages() = %+v, scan says %+v", step, e.Path, c, got)
+						}
+					}
+					return nil
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			write := func(f func(tx *Tx) error) {
+				t.Helper()
+				if err := s.Write(ctx, f); err != nil {
+					t.Fatal(err)
+				}
+			}
+			write(func(tx *Tx) error {
+				if err := tx.InsertEntity(a); err != nil {
+					return err
+				}
+				if err := tx.InsertEntity(b); err != nil {
+					return err
+				}
+				for i := 1; i <= 12; i++ {
+					m := &Message{EntityID: a.ID, Seq: int64(i), EnqueuedAt: 1, VisibleAt: 1, Payload: []byte("xy")}
+					if err := tx.InsertMessage(m); err != nil {
+						return err
+					}
+					ms = append(ms, m)
+				}
+				return nil
+			})
+			check("insert")
+			write(func(tx *Tx) error { // state changes, a dead letter, a move to another entity
+				ms[0].State = StateDeferred
+				ms[1].State = StateScheduled
+				ms[2].Subqueue = SubqueueDeadLetter
+				ms[3].EntityID = b.ID
+				for _, m := range ms[:4] {
+					if err := tx.UpdateMessage(m); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			check("update")
+			write(func(tx *Tx) error { // updates that touch neither group nor entity
+				for _, m := range ms[4:8] {
+					m.DeliveryCount++
+					m.Payload = []byte("longer payload")
+					if err := tx.UpdateMessage(m); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			check("same group")
+			write(func(tx *Tx) error {
+				if err := tx.DeleteMessage(ms[5].ID); err != nil {
+					return err
+				}
+				return tx.DeleteAllMessages(a.ID, SubqueueDeadLetter)
+			})
+			check("delete")
+			// A rolled back write changes nothing.
+			s.Write(ctx, func(tx *Tx) error {
+				tx.DeleteAllMessages(a.ID, SubqueueActive)
+				return context.Canceled
+			})
+			check("rollback")
+		})
+	}
+}
+
+// BenchmarkCountMessages shows that counting does not grow with the messages
+// in the queue.
+func BenchmarkCountMessages(b *testing.B) {
+	for _, n := range []int{1000, 20000, 200000} {
+		b.Run(fmt.Sprint(n), func(b *testing.B) {
+			ctx := context.Background()
+			s, err := Open(ctx, Memory)
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer s.Close()
+			q := &Entity{Kind: "queue", Path: "q", Name: "Q", Props: []byte("{}")}
+			err = s.Write(ctx, func(tx *Tx) error {
+				if err := tx.InsertEntity(q); err != nil {
+					return err
+				}
+				for i := 1; i <= n; i++ {
+					if err := tx.InsertMessage(&Message{EntityID: q.ID, Seq: int64(i), EnqueuedAt: 1, VisibleAt: 1, Payload: []byte("x")}); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.ResetTimer()
+			for range b.N {
+				if err := s.Read(ctx, func(tx *Tx) error { _, err := tx.CountMessages(q.ID); return err }); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkInsertDeleteMessage is the write cost of the triggers that keep
+// sizes and counts: one insert and one delete per iteration.
+func BenchmarkInsertDeleteMessage(b *testing.B) {
+	ctx := context.Background()
+	s, err := Open(ctx, Memory)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer s.Close()
+	q := &Entity{Kind: "queue", Path: "q", Name: "Q", Props: []byte("{}")}
+	if err := s.Write(ctx, func(tx *Tx) error { return tx.InsertEntity(q) }); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := range b.N {
+		err := s.Write(ctx, func(tx *Tx) error {
+			m := &Message{EntityID: q.ID, Seq: int64(i + 1), EnqueuedAt: 1, VisibleAt: 1, Payload: []byte("payload")}
+			if err := tx.InsertMessage(m); err != nil {
+				return err
+			}
+			return tx.DeleteMessage(m.ID)
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}

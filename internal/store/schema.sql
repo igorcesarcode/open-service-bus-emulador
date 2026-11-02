@@ -140,6 +140,39 @@ DELETE FROM entity_sizes;
 INSERT INTO entity_sizes (entity_id, size_bytes)
     SELECT entity_id, SUM(LENGTH(payload)) FROM messages GROUP BY entity_id;
 
+-- Messages per entity, sub-queue and state, kept by triggers so counting is a
+-- read of a few rows instead of a walk over every message.
+CREATE TABLE IF NOT EXISTS entity_counts (
+    entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    subqueue  INTEGER NOT NULL,
+    state     INTEGER NOT NULL,
+    n         INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (entity_id, subqueue, state)
+) WITHOUT ROWID;
+
+CREATE TRIGGER IF NOT EXISTS messages_count_insert AFTER INSERT ON messages BEGIN
+    INSERT INTO entity_counts (entity_id, subqueue, state, n) VALUES (NEW.entity_id, NEW.subqueue, NEW.state, 1)
+        ON CONFLICT (entity_id, subqueue, state) DO UPDATE SET n = n + 1;
+END;
+
+CREATE TRIGGER IF NOT EXISTS messages_count_delete AFTER DELETE ON messages BEGIN
+    UPDATE entity_counts SET n = n - 1 WHERE entity_id = OLD.entity_id AND subqueue = OLD.subqueue AND state = OLD.state;
+END;
+
+-- Updates rewrite every column, so only a move between groups changes counts.
+CREATE TRIGGER IF NOT EXISTS messages_count_update AFTER UPDATE OF state, subqueue, entity_id ON messages
+    WHEN OLD.state <> NEW.state OR OLD.subqueue <> NEW.subqueue OR OLD.entity_id <> NEW.entity_id
+BEGIN
+    UPDATE entity_counts SET n = n - 1 WHERE entity_id = OLD.entity_id AND subqueue = OLD.subqueue AND state = OLD.state;
+    INSERT INTO entity_counts (entity_id, subqueue, state, n) VALUES (NEW.entity_id, NEW.subqueue, NEW.state, 1)
+        ON CONFLICT (entity_id, subqueue, state) DO UPDATE SET n = n + 1;
+END;
+
+-- Recomputed at every start, which repairs counts of older databases.
+DELETE FROM entity_counts;
+INSERT INTO entity_counts (entity_id, subqueue, state, n)
+    SELECT entity_id, subqueue, state, COUNT(*) FROM messages GROUP BY entity_id, subqueue, state;
+
 -- Metrics in one-minute buckets. entity is the normalized path of a queue,
 -- topic or subscription, or "" for the namespace; minute is the Unix time
 -- divided by 60. There is no foreign key: the history of a deleted entity

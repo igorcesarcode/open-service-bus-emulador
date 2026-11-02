@@ -84,7 +84,7 @@ func tables(ctx context.Context, db *sql.DB) ([]string, error) {
 }
 
 // derived tables are rebuilt from the others after a copy.
-var derived = map[string]bool{"entity_sizes": true}
+var derived = map[string]bool{"entity_sizes": true, "entity_counts": true}
 
 // Reset deletes every row of the store, to be filled again by a copy.
 func (s *Store) Reset(ctx context.Context) error {
@@ -149,6 +149,13 @@ func (s *Store) CopyTo(ctx context.Context, dst *Store, after func()) error {
 	}
 	if _, err := out.Exec(`INSERT INTO entity_sizes (entity_id, size_bytes)
 		SELECT entity_id, SUM(LENGTH(payload)) FROM messages GROUP BY entity_id`); err != nil {
+		return err
+	}
+	if _, err := out.Exec(`DELETE FROM entity_counts`); err != nil {
+		return err
+	}
+	if _, err := out.Exec(`INSERT INTO entity_counts (entity_id, subqueue, state, n)
+		SELECT entity_id, subqueue, state, COUNT(*) FROM messages GROUP BY entity_id, subqueue, state`); err != nil {
 		return err
 	}
 	if err := out.Commit(); err != nil {
