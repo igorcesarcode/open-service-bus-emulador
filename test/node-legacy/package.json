@@ -1,0 +1,12 @@
+{
+  "name": "open-service-bus-node-legacy-test",
+  "private": true,
+  "description": "The administration client of @azure/service-bus 7.9.5, which always uses HTTPS.",
+  "type": "module",
+  "scripts": {
+    "test": "node admin.mjs"
+  },
+  "dependencies": {
+    "@azure/service-bus": "7.9.5"
+  }
+}

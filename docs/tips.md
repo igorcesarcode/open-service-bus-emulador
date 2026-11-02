@@ -49,6 +49,12 @@ transport that skips verification in tests, or write the certificate with
 `NODE_EXTRA_CA_CERTS=cert.pem` for Node, or install it in the system store on
 macOS and Windows. For another host name, add it with `-tls-hosts`.
 
+**`RestError: self-signed certificate` (JavaScript admin client).**
+`@azure/service-bus` 7.9.5 and older always call the management API over
+HTTPS, ignoring `UseDevelopmentEmulator`. Update to 7.10.0, where emulator mode
+uses plain HTTP, or trust the certificate as above
+(`NODE_EXTRA_CA_CERTS=cert.pem`).
+
 **Connection refused / timeouts.** Check the port in the startup log; check
 the firewall on Windows; inside containers do not use `localhost` for another
 container.

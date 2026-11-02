@@ -18,5 +18,9 @@ queue orders: scheduled message arrived: later
 admin: created queue node-sdk-demo, lock duration PT5S
 ```
 
-In emulator mode the JavaScript administration client uses plain HTTP on the
-connection string's port, so nothing else needs configuring.
+With `@azure/service-bus` 7.10.0 or newer (what this example installs), the
+administration client uses plain HTTP on the connection string's port in
+emulator mode, so nothing else needs configuring. Older versions (7.9.5 and
+before) always use HTTPS: start the emulator with `-tls-cert-out cert.pem` and
+run Node with `NODE_EXTRA_CA_CERTS=cert.pem`, or the client fails with
+`self-signed certificate`.

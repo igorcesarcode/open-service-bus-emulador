@@ -499,7 +499,8 @@ test("auto-forwarding", async () => {
 });
 
 // The administration client uses plain HTTP on the connection string's
-// port in emulator mode.
+// port in emulator mode (@azure/service-bus 7.10.0 and newer; test/node-legacy
+// covers 7.9.5, which always uses HTTPS).
 const adminClient = new ServiceBusAdministrationClient(adminCs);
 
 async function collect(iterator) {
