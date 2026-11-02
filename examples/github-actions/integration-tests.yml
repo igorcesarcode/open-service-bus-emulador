@@ -8,7 +8,7 @@ name: integration-tests
 on: [push, pull_request]
 
 env:
-  OSB_VERSION: v1.0.0   # a release of the repository
+  OSB_VERSION: v1.1.1   # a release of the repository
 
 jobs:
   # Option A: download the single binary and run it in the background.
