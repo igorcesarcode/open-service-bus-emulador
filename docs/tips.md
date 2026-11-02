@@ -49,6 +49,13 @@ transport that skips verification in tests, or write the certificate with
 `NODE_EXTRA_CA_CERTS=cert.pem` for Node, or install it in the system store on
 macOS and Windows. For another host name, add it with `-tls-hosts`.
 
+**The application hangs or retries forever, and the emulator logs nothing.**
+Without `UseDevelopmentEmulator=true` the SDK uses TLS on port **5671** unless
+the `Endpoint` names a port, and the emulator listens on 5672. Add the port
+(`Endpoint=sb://servicebus:5672/;...`), or run the emulator with
+`-amqp-addr :5671` and publish that port. See
+[Connecting without `UseDevelopmentEmulator`](usage.md#connecting-without-usedevelopmentemulator).
+
 **`RestError: self-signed certificate` (JavaScript admin client).**
 `@azure/service-bus` 7.9.5 and older always call the management API over
 HTTPS, ignoring `UseDevelopmentEmulator`. Update to 7.10.0, where emulator mode

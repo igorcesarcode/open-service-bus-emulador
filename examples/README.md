@@ -2,8 +2,8 @@
 
 Each folder shows a different way to use open-service-bus. Unless noted, they
 need the emulator running; see the [installation guide](../docs/installation.md)
-(the container image and release downloads are placeholders until they are
-published; building from source works today).
+(release downloads and the container image are described there; building
+from source works too).
 
 | Example | Shows | Needs |
 | --- | --- | --- |
